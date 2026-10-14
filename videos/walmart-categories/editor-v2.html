@@ -1,0 +1,502 @@
+<title>Walmart Categories Studio v2</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;800;900&family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: studio split — sticky 9:16 preview + transport on the left, scene-by-scene edit panel on the right; stacks on phones */
+:root {
+  --bg: #F3F4F6; --panel: #FFFFFF; --line: #E3E5EA; --fg: #17181C; --muted: #6A6F7A;
+  --accent: #FF6A00; --accent-ink: #FFFFFF; --stage: #E8EAEE;
+  --ui: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121316; --panel: #1B1D21; --line: #2C2F35; --fg: #EDEEF0; --muted: #9AA0AA;
+  --accent: #FF7A1A; --accent-ink: #FFFFFF; --stage: #0C0D0F; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #121316; --panel: #1B1D21; --line: #2C2F35; --fg: #EDEEF0; --muted: #9AA0AA;
+  --accent: #FF7A1A; --accent-ink: #FFFFFF; --stage: #0C0D0F; color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--ui); font-size: 14px; line-height: 1.45; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-block: 20px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+header.top h1 { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.01em; text-wrap: balance; }
+header.top p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+.status { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.grid { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 860px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.stagecol { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); display: flex; flex-direction: column; gap: 12px; }
+@media (max-width: 860px) { .stagecol { position: static; } }
+.stage { background: var(--stage); border-radius: 18px; padding: 16px; display: flex; justify-content: center; }
+canvas#view { width: 100%; max-width: 360px; aspect-ratio: 9 / 16; height: auto; border-radius: 14px; display: block;
+  box-shadow: 0 10px 30px rgba(0,0,0,.12); background: #fff; }
+.transport { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.trow { display: flex; align-items: center; gap: 10px; }
+.tc { font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 92px; text-align: right; }
+.scrub { flex: 1; min-width: 0; }
+.scrub input[type=range] { width: 100%; accent-color: var(--accent); }
+.marks { display: flex; font-size: 11px; color: var(--muted); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.marks span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; border-left: 2px solid var(--line); padding-left: 6px; cursor: pointer; }
+.marks span:hover { color: var(--accent); }
+button { font: inherit; cursor: pointer; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); padding: 9px 14px; font-weight: 700; }
+button:hover { border-color: var(--accent); }
+button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+button.icon { width: 40px; height: 40px; padding: 0; display: grid; place-items: center; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.actions button { flex: 1 1 auto; }
+.note { font-size: 12px; color: var(--muted); margin: 0; }
+.panel { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+section.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; min-width: 0; }
+section.card h2 { margin: 0 0 12px; font-size: 13px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+section.card h2 small { font-family: var(--mono); font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--muted); font-size: 11px; }
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
+@media (max-width: 520px) { .fields { grid-template-columns: minmax(0, 1fr); } }
+.fields .full { grid-column: 1 / -1; }
+label.f { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+label.f span { font-size: 12px; font-weight: 700; color: var(--muted); }
+input[type=text], textarea { width: 100%; font: inherit; font-weight: 600; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 9px 10px; min-width: 0; }
+textarea { resize: vertical; min-height: 62px; }
+.colors { display: flex; flex-wrap: wrap; gap: 12px; }
+.sw { display: flex; align-items: center; gap: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px 6px 6px; }
+.sw input[type=color] { width: 34px; height: 30px; border: 0; padding: 0; background: none; cursor: pointer; }
+.sw span { font-size: 12px; font-weight: 700; }
+.sw code { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.range { display: grid; grid-template-columns: 110px minmax(0,1fr) 52px; align-items: center; gap: 10px; }
+.range + .range { margin-top: 8px; }
+.range span { font-size: 12px; font-weight: 700; color: var(--muted); }
+.range output { font-family: var(--mono); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+.range input { accent-color: var(--accent); width: 100%; }
+.logo-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 12px; }
+.logo-prev { width: 56px; height: 56px; border-radius: 50%; border: 2px solid var(--accent); background: #fff; display: grid; place-items: center; overflow: hidden; }
+.logo-prev img { max-width: 70%; max-height: 70%; }
+.tip { font-size: 12px; color: var(--muted); margin: 10px 0 0; }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Walmart Categories Studio v2</h1>
+      <p>15-second SaaS promo · 1080 × 1920 · edit on the right, watch it update on the left</p>
+    </div>
+    <div class="status" id="status" aria-live="polite">Example settings loaded</div>
+  </header>
+  <div class="grid">
+    <div class="stagecol">
+      <div class="stage"><canvas id="view" width="1080" height="1920" aria-label="Animation preview"></canvas></div>
+      <div class="transport">
+        <div class="trow">
+          <button class="icon" id="play" aria-label="Pause">❚❚</button>
+          <div class="scrub"><input type="range" id="scrub" min="0" max="15" step="0.01" value="0" aria-label="Timeline"></div>
+          <div class="tc" id="tc">00.00 / 15.00</div>
+        </div>
+        <div class="marks" id="marks"></div>
+      </div>
+      <div class="actions">
+        <button class="primary" id="save">Save for final render</button>
+        <button id="export">Download preview (.webm)</button>
+      </div>
+      <p class="note" id="note">Save stores your edits so Claude can render the final HD MP4 with music. The preview download is silent.</p>
+    </div>
+    <div class="panel">
+      <section class="card">
+        <h2>Scene 1 · Hook <small id="d1"></small></h2>
+        <div class="fields">
+          <label class="f"><span>Heading line 1 (zooms in)</span><input type="text" id="h1"></label>
+          <label class="f"><span>Heading line 2</span><input type="text" id="h2"></label>
+          <label class="f full"><span>Typed in the search bar (orange)</span><input type="text" id="h3"></label>
+        </div>
+      </section>
+      <section class="card">
+        <h2>Scene 2 · Categories <small id="d2"></small></h2>
+        <div class="fields">
+          <label class="f"><span>Category 1</span><input type="text" id="c0"></label>
+          <label class="f"><span>Category 2</span><input type="text" id="c1"></label>
+          <label class="f"><span>Category 3</span><input type="text" id="c2"></label>
+          <label class="f"><span>Category 4</span><input type="text" id="c3"></label>
+          <label class="f full"><span>Category 5</span><input type="text" id="c4"></label>
+        </div>
+      </section>
+      <section class="card">
+        <h2>Scene 3 · Marketplace <small id="d3"></small></h2>
+        <div class="fields">
+          <label class="f full"><span>Body text</span><textarea id="body"></textarea></label>
+          <label class="f full"><span>Typed highlight (orange)</span><input type="text" id="bodyHi"></label>
+        </div>
+        <div class="logo-row">
+          <div class="logo-prev" id="logoPrev" aria-hidden="true"></div>
+          <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+            <label class="f"><span>Centre logo (PNG or SVG, optional)</span><input type="file" id="logo" accept="image/png,image/svg+xml,image/jpeg,image/webp"></label>
+            <button id="logoClear" type="button">Use cart icon</button>
+          </div>
+        </div>
+      </section>
+      <section class="card">
+        <h2>Scene 4 · Call to action <small id="d4"></small></h2>
+        <div class="fields">
+          <label class="f"><span>Heading line 1</span><input type="text" id="t1"></label>
+          <label class="f"><span>Heading line 2</span><input type="text" id="t2"></label>
+          <label class="f"><span>Orange highlight</span><input type="text" id="t3"></label>
+          <label class="f"><span>Typed in the URL bar</span><input type="text" id="url"></label>
+        </div>
+      </section>
+      <section class="card">
+        <h2>Brand colours</h2>
+        <div class="colors">
+          <label class="sw"><input type="color" id="colAccent"><span>Accent / icons</span><code id="colAccentV"></code></label>
+          <label class="sw"><input type="color" id="colText"><span>Text</span><code id="colTextV"></code></label>
+          <label class="sw"><input type="color" id="colBg"><span>Background</span><code id="colBgV"></code></label>
+        </div>
+      </section>
+      <section class="card">
+        <h2>Timing <small id="total"></small></h2>
+        <div class="range"><span>Hook</span><input type="range" id="tHook" min="2.6" max="5" step="0.1"><output id="tHookV"></output></div>
+        <div class="range"><span>Categories</span><input type="range" id="tCats" min="3" max="6" step="0.1"><output id="tCatsV"></output></div>
+        <div class="range"><span>Marketplace</span><input type="range" id="tHub" min="3.8" max="7" step="0.1"><output id="tHubV"></output></div>
+        <div class="range"><span>Call to action</span><input type="range" id="tCta" min="3" max="5" step="0.1"><output id="tCtaV"></output></div>
+        <p class="tip">Headings are always set in capitals. Long text shrinks to fit the frame.</p>
+      </section>
+      <div class="actions"><button id="reset" type="button">Reset to original</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const ICONS = {
+  smartphone: "M 7 2 L 17 2 C 18.105 2 19 2.895 19 4 L 19 20 C 19 21.105 18.105 22 17 22 L 7 22 C 5.895 22 5 21.105 5 20 L 5 4 C 5 2.895 5.895 2 7 2 Z M 12 18 L 12.01 18",
+  sparkles: "M 11.017 2.814 C 11.105 2.341 11.519 1.998 12 1.998 C 12.481 1.998 12.895 2.341 12.983 2.814 L 14.034 8.372 C 14.187 9.181 14.819 9.813 15.628 9.966 L 21.186 11.017 C 21.659 11.105 22.002 11.519 22.002 12 C 22.002 12.481 21.659 12.895 21.186 12.983 L 15.628 14.034 C 14.819 14.187 14.187 14.819 14.034 15.628 L 12.983 21.186 C 12.895 21.659 12.481 22.002 12 22.002 C 11.519 22.002 11.105 21.659 11.017 21.186 L 9.966 15.628 C 9.813 14.819 9.181 14.187 8.372 14.034 L 2.814 12.983 C 2.341 12.895 1.998 12.481 1.998 12 C 1.998 11.519 2.341 11.105 2.814 11.017 L 8.372 9.966 C 9.181 9.813 9.813 9.181 9.966 8.372 Z M 20 2 L 20 6 M 22 4 L 18 4 M 6 20 C 6 21.105 5.105 22 4 22 C 2.895 22 2 21.105 2 20 C 2 18.895 2.895 18 4 18 C 5.105 18 6 18.895 6 20 Z",
+  house: "M 15 21 L 15 13 C 15 12.448 14.552 12 14 12 L 10 12 C 9.448 12 9 12.448 9 13 L 9 21 M 3 10 C 3 9.411 3.259 8.852 3.709 8.472 L 10.709 2.472 C 11.454 1.842 12.546 1.842 13.291 2.472 L 20.291 8.472 C 20.741 8.852 21 9.411 21 10 L 21 19 C 21 20.105 20.105 21 19 21 L 5 21 C 3.895 21 3 20.105 3 19 Z",
+  shirt: "M 20.38 3.46 L 16 2 C 16 4.209 14.209 6 12 6 C 9.791 6 8 4.209 8 2 L 3.62 3.46 C 2.685 3.772 2.116 4.718 2.28 5.69 L 2.86 9.16 C 2.939 9.645 3.358 10.001 3.85 10 L 6 10 L 6 20 C 6 21.1 6.9 22 8 22 L 16 22 C 17.105 22 18 21.105 18 20 L 18 10 L 20.15 10 C 20.642 10.001 21.061 9.645 21.14 9.16 L 21.72 5.69 C 21.884 4.718 21.315 3.772 20.38 3.46 Z",
+  heart: "M 2 9.5 C 2 7.222 3.404 5.18 5.532 4.364 C 7.659 3.549 10.068 4.13 11.591 5.824 C 11.697 5.937 11.845 6.001 12 6.001 C 12.155 6.001 12.303 5.937 12.409 5.824 C 13.927 4.118 16.343 3.53 18.475 4.347 C 20.607 5.165 22.011 7.217 22 9.5 C 22 11.79 20.5 13.5 19 15 L 13.508 20.313 C 13.131 20.746 12.586 20.996 12.012 21 C 11.438 21.003 10.89 20.76 10.508 20.332 L 5 15 C 3.5 13.5 2 11.8 2 9.5 M 3.22 13 L 9.5 13 L 10 12 L 12 16.5 L 14 9.5 L 15.5 13 L 20.77 13",
+  cart: "M 9 21 C 9 21.552 8.552 22 8 22 C 7.448 22 7 21.552 7 21 C 7 20.448 7.448 20 8 20 C 8.552 20 9 20.448 9 21 Z M 20 21 C 20 21.552 19.552 22 19 22 C 18.448 22 18 21.552 18 21 C 18 20.448 18.448 20 19 20 C 19.552 20 20 20.448 20 21 Z M 2.05 2.05 L 4.05 2.05 L 6.71 14.47 C 6.911 15.408 7.751 16.071 8.71 16.05 L 18.49 16.05 C 19.428 16.048 20.238 15.396 20.44 14.48 L 22.09 7.05 L 5.12 7.05",
+  store: "M 15 21 L 15 16 C 15 15.448 14.552 15 14 15 L 10 15 C 9.448 15 9 15.448 9 16 L 9 21 M 17.774 10.31 C 17.341 9.895 16.658 9.895 16.225 10.31 C 15.259 11.231 13.74 11.231 12.774 10.31 C 12.341 9.896 11.659 9.896 11.226 10.31 C 10.26 11.232 8.74 11.232 7.774 10.31 C 7.341 9.895 6.658 9.895 6.225 10.31 C 5.294 11.198 3.842 11.235 2.867 10.395 C 1.893 9.556 1.714 8.114 2.455 7.062 L 5.344 2.878 C 5.716 2.329 6.337 2 7 2 L 17 2 C 17.661 2 18.28 2.327 18.653 2.873 L 21.548 7.065 C 22.289 8.118 22.109 9.561 21.133 10.4 C 20.157 11.239 18.703 11.199 17.774 10.309 M 4 10.95 L 4 19 C 4 20.105 4.895 21 6 21 L 18 21 C 19.105 21 20 20.105 20 19 L 20 10.95",
+  arrow: "M 5 12 L 19 12 M 12 5 L 19 12 L 12 19",
+  pointer: "M 4.037 4.688 C 3.956 4.502 3.998 4.285 4.141 4.141 C 4.285 3.998 4.502 3.956 4.688 4.037 L 20.688 10.537 C 20.888 10.618 21.013 10.818 20.998 11.033 C 20.984 11.248 20.834 11.43 20.625 11.484 L 14.501 13.064 C 13.796 13.245 13.246 13.795 13.063 14.499 L 11.484 20.625 C 11.43 20.834 11.248 20.984 11.033 20.998 C 10.818 21.013 10.618 20.888 10.537 20.688 Z",
+};
+ICONS.search = "M 19 11 C 19 15.418 15.418 19 11 19 C 6.582 19 3 15.418 3 11 C 3 6.582 6.582 3 11 3 C 15.418 3 19 6.582 19 11 Z M 21 21 L 16.65 16.65";
+ICONS.globe = "M 22 12 C 22 17.523 17.523 22 12 22 C 6.477 22 2 17.523 2 12 C 2 6.477 6.477 2 12 2 C 17.523 2 22 6.477 22 12 Z M 12 2 C 9.333 4.8 8 8.133 8 12 C 8 15.867 9.333 19.2 12 22 C 14.667 19.2 16 15.867 16 12 C 16 8.133 14.667 4.8 12 2 Z M 2 12 L 22 12";
+const P2D = Object.fromEntries(Object.entries(ICONS).map(([k, d]) => [k, new Path2D(d)]));
+const CAT_ICONS = ["smartphone", "sparkles", "house", "shirt", "heart"];
+
+const DEFAULTS = {
+  h1: "Walmart isn't", h2: "Just about", h3: "Groceries",
+  cats: ["Electronics", "Beauty", "Home", "Fashion", "Health & Wellness"],
+  body: "Thousands of businesses sell across categories through", bodyHi: "Walmart Marketplace",
+  t1: "See where", t2: "Your product", t3: "Could fit", url: "www.eskillvisor.com",
+  accent: "#FF6A00", text: "#111111", bg: "#FFFFFF",
+  tHook: 3.2, tCats: 3.8, tHub: 4.6, tCta: 3.4, logoId: null,
+};
+let S = structuredClone(DEFAULTS);
+let logoImg = null;
+
+// ---------- helpers ----------
+const hex = h => { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+const mix = (a, b, t) => { const A = hex(a), B = hex(b); return "rgb(" + A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(",") + ")"; };
+const rgba = (h, a) => { const [r, g, b] = hex(h); return `rgba(${r},${g},${b},${a})`; };
+const cl = x => Math.max(0, Math.min(1, x));
+const eo = t => 1 - Math.pow(1 - t, 4);
+const ei = t => t * t * t;
+const eio = t => t < .5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2;
+const back = t => { const c = 1.3, u = t - 1; return 1 + (c + 1) * u * u * u + c * u * u; };
+const lerp = (a, b, t) => a + (b - a) * t;
+const prog = (t, at, dur) => cl((t - at) / dur);
+
+const cv = document.getElementById("view"), ctx = cv.getContext("2d");
+const W = 1080, H = 1920;
+const font = (w, s) => `${w} ${s}px Inter, "Helvetica Neue", Arial, sans-serif`;
+let gA = 1, sBlur = 0;
+function blur(b) { const v = sBlur + (b || 0); ctx.filter = v > 0.4 ? `blur(${v.toFixed(1)}px)` : "none"; }
+function alpha(a) { ctx.globalAlpha = cl(a) * gA; }
+function rr(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
+function icon(name, x, y, size, color, sw) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(size / 24, size / 24);
+  ctx.strokeStyle = color; ctx.lineWidth = sw; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.stroke(P2D[name]); ctx.restore();
+}
+function fitSize(text, weight, size, maxW, ls = 0) {
+  ctx.font = font(weight, size); ctx.letterSpacing = ls + "px";
+  const w = ctx.measureText(text).width; ctx.letterSpacing = "0px";
+  return w > maxW ? Math.floor(size * maxW / w) : size;
+}
+function txt(text, x, y, size, weight, color, a = 1, ls = 0, align = "center", base = "top") {
+  ctx.font = font(weight, size); ctx.letterSpacing = ls + "px"; ctx.textAlign = align; ctx.textBaseline = base;
+  ctx.fillStyle = color; alpha(a); ctx.fillText(text, x, y); ctx.letterSpacing = "0px"; ctx.textAlign = "left";
+}
+function measure(text, size, weight, ls = 0) { ctx.font = font(weight, size); ctx.letterSpacing = ls + "px"; const w = ctx.measureText(text).width; ctx.letterSpacing = "0px"; return w; }
+// glass panel with soft glow
+function glass(x, y, w, h, r, glow = 0.18, a = 1) {
+  ctx.save(); alpha(a);
+  ctx.shadowColor = rgba(S.accent, glow); ctx.shadowBlur = 60; ctx.shadowOffsetY = 18;
+  rr(x, y, w, h, r); ctx.fillStyle = rgba(S.bg, 0.92); ctx.fill();
+  ctx.shadowColor = "transparent";
+  const g = ctx.createLinearGradient(x, y, x + w, y + h);
+  g.addColorStop(0, rgba(S.accent, 0.55)); g.addColorStop(0.5, rgba(S.text, 0.06)); g.addColorStop(1, rgba(S.accent, 0.35));
+  ctx.lineWidth = 2.5; ctx.strokeStyle = g; ctx.stroke(); ctx.restore();
+}
+function caret(x, y, h, t, typing) { if (typing || Math.floor(t * 2.2) % 2 === 0) { ctx.fillStyle = S.accent; alpha(1); rr(x, y, 6, h, 3); ctx.fill(); } }
+// tracking-in heading: letters condense, blur clears
+function track(text, y, size, color, t, at, dur = 0.8, glow = 0) {
+  const k = prog(t, at, dur); if (!k) return; const e = eo(k);
+  size = fitSize(text, 900, size, 1000, -2);
+  ctx.save(); blur((1 - e) * 14);
+  if (glow) { ctx.shadowColor = rgba(S.accent, glow); ctx.shadowBlur = 40; }
+  txt(text, W / 2, y, size, 900, color, Math.min(1, k * 1.6), lerp(36, -2, e)); ctx.restore(); blur(0);
+}
+// scene wrapper: zoom-blur in and out
+function scene(t, D, draw, first, last) {
+  const i = first ? 1 : eo(prog(t, 0, 0.45)), o = last ? 0 : ei(prog(t, D - 0.4, 0.4));
+  const s = lerp(0.86, 1, i) * lerp(1, 1.4, o) * (1 + 0.025 * t / D);
+  ctx.save(); gA = Math.min(i, 1 - o); sBlur = (1 - i) * 18 + o * 24;
+  ctx.translate(W / 2, H / 2); ctx.scale(s, s); ctx.translate(-W / 2, -H / 2);
+  draw(); ctx.restore(); gA = 1; sBlur = 0; ctx.filter = "none";
+}
+// deterministic particles
+const DOTS = Array.from({ length: 34 }, (_, i) => { const r = Math.sin(i * 12.9898) * 43758.5453; const f = r - Math.floor(r);
+  const r2 = Math.sin(i * 78.233) * 12345.678; const g = r2 - Math.floor(r2); return { x: f * W, y: g * H, s: 2 + (i % 4), v: 18 + (i % 5) * 9 }; });
+function background(T) {
+  ctx.fillStyle = S.bg; ctx.fillRect(0, 0, W, H);
+  const pulse = 0.5 + 0.5 * Math.sin(T * 1.3);
+  let g = ctx.createRadialGradient(540, 900, 0, 540, 900, 980);
+  g.addColorStop(0, rgba(S.accent, 0.05 + 0.025 * pulse)); g.addColorStop(0.6, rgba(S.accent, 0.012)); g.addColorStop(1, rgba(S.accent, 0)); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = S.accent;
+  DOTS.forEach(d => { const y = ((d.y - T * d.v) % H + H) % H; ctx.globalAlpha = 0.14 + 0.08 * Math.sin(T * 2 + d.x);
+    ctx.beginPath(); ctx.arc(d.x, y, d.s, 0, Math.PI * 2); ctx.fill(); });
+  ctx.globalAlpha = 1;
+}
+
+// ---------- scene 1: hook ----------
+function hook(t, D) {
+  scene(t, D, () => {
+    // giant line 1 pulls back from the camera
+    const k = prog(t, 0, 1.05), e = eo(k);
+    const l1 = S.h1.toUpperCase(), s1 = fitSize(l1, 900, 104, 1000, -2);
+    ctx.save(); ctx.translate(540, 640 + s1 / 2); ctx.scale(lerp(4.5, 1, e), lerp(4.5, 1, e)); ctx.translate(-540, -(640 + s1 / 2));
+    blur((1 - e) * 10); txt(l1, W / 2, 640, s1, 900, S.text, Math.min(1, k * 3), -2); ctx.restore(); blur(0);
+    track(S.h2.toUpperCase(), 760, 104, S.text, t, 0.55, 0.8);
+    // search bar types the highlight
+    const b = prog(t, 1.15, 0.6); if (!b) return; const be = eo(b);
+    const bx = 100, bw = 880, bh = 160, by = 950 + 70 * (1 - be);
+    ctx.save(); blur((1 - be) * 10); glass(bx, by, bw, bh, 80, 0.30, b); blur(0);
+    alpha(b); icon("search", bx + 52, by + 48, 64, S.accent, 2.4);
+    const word = S.h3.toUpperCase(), size = fitSize(word, 900, 84, bw - 230, 1);
+    const n = Math.floor(Math.max(0, t - 1.7) / 0.075), shown = word.slice(0, n);
+    txt(shown, bx + 150, by + bh / 2 + 4, size, 900, S.accent, b, 1, "left", "middle");
+    const cw = measure(shown, size, 900, 1);
+    caret(bx + 152 + cw + 6, by + 42, bh - 84, t, n > 0 && n < word.length);
+    ctx.restore();
+    // sparkle pops when typing completes
+    const done = 1.7 + word.length * 0.075, sp = prog(t, done + 0.05, 0.5);
+    if (sp > 0) { const s = back(sp); ctx.save(); alpha(cl(sp * 2) * (1 - prog(t, done + 0.9, 0.4)));
+      ctx.translate(bx + bw - 40, by - 10); ctx.scale(s, s); icon("sparkles", -36, -36, 72, S.accent, 2); ctx.restore(); }
+  }, true, false);
+}
+
+// ---------- scene 2: categories fly past in depth ----------
+function categories(t, D) {
+  const pos = [[-60, -120], [70, 40], [-60, 120], [60, -60], [0, 40]];
+  const span = 650, seg = (D - 0.3) / 5, si = Math.min(5, Math.floor(t / seg)), fr = si >= 5 ? 1 : cl((t - si * seg) / seg);
+  const camZ = 700 + span * (si - 1 + (si >= 5 ? 1 + (t - 5 * seg) / 0.3 * 0.6 : eo(fr)));
+  scene(t, D, () => {
+    const items = S.cats.map((c, i) => ({ c, i, d: 700 + i * span - camZ })).filter(o => o.d > -420 && o.d < 3800).sort((a, b) => b.d - a.d);
+    items.forEach(({ c, i, d }) => {
+      const sc = 900 / (900 + d), [ox, oy] = pos[i];
+      const a = cl((3600 - d) / 900) * cl((d + 420) / 260);
+      const bl = d > 120 ? Math.min(16, (d - 120) / 110) : d < -60 ? Math.min(22, (-60 - d) / 14) : 0;
+      const w = 600, h = 190, px = 540 + ox * sc * 1.1, py = 960 + oy * sc * 1.1;
+      ctx.save(); ctx.translate(px, py); ctx.scale(sc, sc); ctx.translate(-w / 2, -h / 2); blur(bl);
+      glass(0, 0, w, h, 52, 0.25, a);
+      alpha(a); rr(30, 30, 130, 130, 36); ctx.fillStyle = mix(S.accent, S.bg, 0.88); ctx.fill();
+      icon(CAT_ICONS[i], 55, 55, 80, S.accent, 2.1);
+      const fs = fitSize(c, 800, 60, w - 220);
+      txt(c, 190, h / 2 + 3, fs, 800, S.text, a, -1, "left", "middle");
+      ctx.restore(); blur(0);
+    });
+  }, false, false);
+}
+
+// ---------- scene 3: marketplace orbit ----------
+function panel(i, label) {
+  const w = 340, h = 250;
+  glass(0, 0, w, h, 28, 0.2, 1);
+  ["#FF5F57", "#FEBC2E", "#28C840"].forEach((c, k) => { ctx.fillStyle = mix(k === 0 ? S.accent : S.text, S.bg, k === 0 ? 0.2 : 0.8); ctx.beginPath(); ctx.arc(24 + k * 20, 22, 6, 0, 7); ctx.fill(); });
+  rr(22, 48, 76, 76, 20); ctx.fillStyle = mix(S.accent, S.bg, 0.88); ctx.fill();
+  icon(CAT_ICONS[i], 36, 62, 48, S.accent, 2.2);
+  const fs = fitSize(label, 800, 34, w - 130); txt(label, 114, 86, fs, 800, S.text, 1, -0.5, "left", "middle");
+  ctx.fillStyle = mix(S.text, S.bg, 0.9); rr(22, 146, 296, 14, 7); ctx.fill(); rr(22, 172, 210, 14, 7); ctx.fill();
+  rr(22, 200, 128, 34, 17); ctx.fillStyle = S.accent; ctx.fill();
+  icon("arrow", 70, 205, 24, "#FFFFFF", 2.6);
+}
+function hub(t, D) {
+  const cx = 540, cy = 780;
+  scene(t, D, () => {
+    // pulse rings
+    for (let r = 0; r < 3; r++) { const ph = ((t * 0.55 + r / 3) % 1), on = prog(t, 0.2, 0.4);
+      alpha(on * (1 - ph) * 0.55); ctx.lineWidth = 3; ctx.strokeStyle = S.accent; ctx.beginPath(); ctx.arc(cx, cy, 170 + ph * 470, 0, 7); ctx.stroke(); }
+    alpha(1);
+    const ps = S.cats.map((c, i) => { const a = (-90 + i * 72 + t * 16) * Math.PI / 180; return { c, i, x: Math.cos(a) * 360, z: Math.sin(a) }; }).sort((a, b) => a.z - b.z);
+    const drawPanel = p => { const k = prog(t, 0.2 + p.i * 0.12, 0.8); if (!k) return; const e = eo(k);
+      const depth = (p.z + 1) / 2, sc = lerp(0.6, 0.86, depth) * lerp(0.3, 1, e);
+      const x = cx + p.x * e, y = cy + p.z * 235 * e;
+      ctx.save(); ctx.translate(x, y); ctx.scale(sc, sc); ctx.translate(-170, -125); blur((1 - depth) * 3.5 + (1 - e) * 14);
+      const g0 = gA; gA = g0 * Math.min(1, k * 2); panel(p.i, p.c); gA = g0; ctx.restore(); blur(0); };
+    ps.filter(p => p.z < 0).forEach(drawPanel);
+    // centre disc
+    const ck = prog(t, 0.05, 0.75);
+    if (ck > 0) { const s = back(ck); ctx.save(); ctx.translate(cx, cy); ctx.scale(s, s); alpha(1);
+      ctx.shadowColor = rgba(S.accent, 0.45); ctx.shadowBlur = 70; ctx.beginPath(); ctx.arc(0, 0, 160, 0, 7); ctx.fillStyle = S.bg; ctx.fill();
+      ctx.shadowColor = "transparent"; ctx.lineWidth = 6; ctx.strokeStyle = S.accent; ctx.stroke();
+      if (logoImg) { const m = 210, r = Math.min(m / logoImg.width, m / logoImg.height); ctx.drawImage(logoImg, -logoImg.width * r / 2, -logoImg.height * r / 2, logoImg.width * r, logoImg.height * r); }
+      else icon("cart", -72, -72, 144, S.accent, 2);
+      ctx.restore(); }
+    ps.filter(p => p.z >= 0).forEach(drawPanel);
+    // body copy, word by word
+    let size = 50; const wrap = s => { ctx.font = font(700, s); const out = []; let line = "";
+      for (const w of S.body.split(" ")) { const L = line ? line + " " + w : w; if (ctx.measureText(L).width > 880 && line) { out.push(line); line = w; } else line = L; } if (line) out.push(line); return out; };
+    let lines = wrap(size); while (lines.length > 3 && size > 30) { size -= 2; lines = wrap(size); }
+    let wi = 0; const y0 = 1290;
+    lines.forEach((ln, li) => { ctx.font = font(700, size); const parts = ln.split(" "), sp = ctx.measureText(" ").width;
+      const ws = parts.map(p => ctx.measureText(p).width), tot = ws.reduce((a, b) => a + b, 0) + sp * (parts.length - 1); let x = 540 - tot / 2;
+      parts.forEach((p, j) => { const k = prog(t, 1.4 + (wi + j) * 0.07, 0.45); if (k) { ctx.save(); blur((1 - eo(k)) * 8); txt(p, x, y0 + li * size * 1.3 + 22 * (1 - eo(k)), size, 700, S.text, k, 0, "left"); ctx.restore(); blur(0); } x += ws[j] + sp; });
+      wi += parts.length; });
+    // typed highlight
+    const hi = S.bodyHi.toUpperCase(), hs = fitSize(hi, 900, 76, 960, -1), hy = y0 + lines.length * size * 1.3 + 40;
+    const start = 1.4 + wi * 0.07 + 0.35, n = Math.floor(Math.max(0, t - start) / 0.06), shown = hi.slice(0, n);
+    if (t > start - 0.2) { const full = measure(hi, hs, 900, -1), x0 = 540 - full / 2;
+      ctx.save(); ctx.shadowColor = rgba(S.accent, 0.35); ctx.shadowBlur = 30; txt(shown, x0, hy, hs, 900, S.accent, 1, -1, "left"); ctx.restore();
+      caret(x0 + measure(shown, hs, 900, -1) + 8, hy + 4, hs * 0.95, t, n > 0 && n < hi.length); }
+  }, false, false);
+}
+
+// ---------- scene 4: call to action ----------
+function cta(t, D) {
+  scene(t, D, () => {
+    track(S.t1.toUpperCase(), 600, 104, S.text, t, 0.05, 0.75);
+    track(S.t2.toUpperCase(), 720, 104, S.text, t, 0.3, 0.75);
+    const k = prog(t, 0.6, 0.7); if (k) { const e = eo(k), w3 = S.t3.toUpperCase(), s3 = fitSize(w3, 900, 132, 1000, -2);
+      ctx.save(); ctx.translate(540, 840 + s3 / 2); ctx.scale(lerp(1.7, 1, e), lerp(1.7, 1, e)); ctx.translate(-540, -(840 + s3 / 2));
+      blur((1 - e) * 14); ctx.shadowColor = rgba(S.accent, 0.35); ctx.shadowBlur = 40; txt(w3, 540, 840, s3, 900, S.accent, Math.min(1, k * 2), -2); ctx.restore(); blur(0); }
+    // URL bar
+    const b = prog(t, 1.1, 0.55); if (!b) return; const be = eo(b);
+    const bx = 90, bw = 900, bh = 150, by = 1130 + 60 * (1 - be);
+    const click = 2.85, pk = t - click;
+    let bs = 1; if (pk > 0 && pk < 0.1) bs = lerp(1, 0.86, pk / 0.1); else if (pk >= 0.1 && pk < 0.45) bs = lerp(0.86, 1, back((pk - 0.1) / 0.35));
+    ctx.save(); blur((1 - be) * 10); glass(bx, by, bw, bh, 75, 0.3, b); blur(0); alpha(b);
+    icon("globe", bx + 46, by + 45, 60, S.accent, 2.2);
+    const url = S.url, us = fitSize(url, 700, 54, bw - 330), n = Math.floor(Math.max(0, t - 1.45) / 0.05), shown = url.slice(0, n);
+    txt(shown, bx + 132, by + bh / 2 + 3, us, 700, S.text, b, 0, "left", "middle");
+    caret(bx + 134 + measure(shown, us, 700) + 6, by + 46, bh - 92, t, n > 0 && n < url.length);
+    const ox = bx + bw - 80, oy = by + bh / 2;
+    ctx.save(); ctx.translate(ox, oy); ctx.scale(bs, bs); ctx.shadowColor = rgba(S.accent, 0.45); ctx.shadowBlur = 30;
+    ctx.beginPath(); ctx.arc(0, 0, 54, 0, 7); ctx.fillStyle = S.accent; ctx.fill(); ctx.shadowColor = "transparent";
+    icon("arrow", -26, -26, 52, "#FFFFFF", 2.8); ctx.restore();
+    if (pk > 0) { const rp = cl(pk / 0.7); alpha((1 - rp) * 0.6); ctx.lineWidth = 4; ctx.strokeStyle = S.accent; ctx.beginPath(); ctx.arc(ox, oy, 54 + rp * 160, 0, 7); ctx.stroke(); }
+    ctx.restore();
+    // pointer glides in and clicks
+    const ck = prog(t, 2.1, 0.7); if (ck > 0) { const e = eo(ck), x = lerp(ox + 260, ox + 8, e), y = lerp(oy + 420, oy + 10, e);
+      ctx.save(); alpha(cl(ck * 3)); ctx.translate(x, y); const ps = pk > 0 && pk < 0.2 ? 2.6 : 3; ctx.scale(ps, ps);
+      ctx.fillStyle = S.bg; ctx.fill(P2D.pointer); ctx.strokeStyle = S.text; ctx.lineWidth = 1.8; ctx.lineJoin = "round"; ctx.stroke(P2D.pointer); ctx.restore(); }
+  }, false, true);
+}
+
+const total = () => S.tHook + S.tCats + S.tHub + S.tCta;
+function render(T) {
+  ctx.save(); background(T);
+  const a = S.tHook, b = a + S.tCats, c = b + S.tHub;
+  if (T < a) hook(T, S.tHook); else if (T < b) categories(T - a, S.tCats); else if (T < c) hub(T - b, S.tHub); else cta(T - c, S.tCta);
+  ctx.restore(); ctx.filter = "none"; ctx.globalAlpha = 1;
+}
+
+// ---------- transport ----------
+let T = 0, playing = !matchMedia("(prefers-reduced-motion: reduce)").matches, last = null, external = false, recording = false, recStart = 0;
+const $ = id => document.getElementById(id);
+const playBtn = $("play"), scrub = $("scrub"), tc = $("tc");
+function setPlay(p) { playing = p; playBtn.textContent = p ? "❚❚" : "▶"; playBtn.setAttribute("aria-label", p ? "Pause" : "Play"); last = null; }
+playBtn.onclick = () => setPlay(!playing);
+scrub.oninput = () => { T = +scrub.value; setPlay(false); };
+function frame(now) {
+  if (external) return;
+  if (recording) T = Math.min(total(), (now - recStart) / 1000);
+  else if (playing) { if (last != null) T += (now - last) / 1000; last = now; if (T >= total()) T = 0; }
+  render(T); scrub.max = total().toFixed(2); scrub.value = T;
+  tc.textContent = `${T.toFixed(2).padStart(5, "0")} / ${total().toFixed(2)}`;
+  requestAnimationFrame(frame);
+}
+window.STUDIO = { renderAt(t) { external = true; render(t); }, total, setState(s) { S = { ...structuredClone(DEFAULTS), ...s }; }, loadLogo(src) { return new Promise(r => { const im = new Image(); im.onload = () => { logoImg = im; r(true); }; im.onerror = () => r(false); im.src = src; }); } };
+
+function marks() {
+  const m = $("marks"), tot = total(); m.innerHTML = ""; let at = 0;
+  [["Hook", S.tHook], ["Categories", S.tCats], ["Marketplace", S.tHub], ["Call to action", S.tCta]].forEach(([n, d], i) => {
+    const s = document.createElement("span"); s.textContent = n; s.style.width = (d / tot * 100) + "%"; s.title = `Jump to ${n}`;
+    const st = at; s.onclick = () => { T = st + 0.01; setPlay(true); }; m.appendChild(s);
+    $("d" + (i + 1)).textContent = `${at.toFixed(1)}–${(at + d).toFixed(1)}s`; at += d; });
+  $("total").textContent = `total ${tot.toFixed(1)}s`;
+}
+
+// ---------- form binding ----------
+const textIds = ["h1", "h2", "h3", "body", "bodyHi", "t1", "t2", "t3", "url"];
+const timeIds = ["tHook", "tCats", "tHub", "tCta"];
+const status = $("status"); let dirty = false;
+function touch() { dirty = true; status.textContent = "Unsaved changes"; marks(); }
+function fill() {
+  textIds.forEach(id => $(id).value = S[id]); S.cats.forEach((c, i) => $("c" + i).value = c);
+  $("colAccent").value = S.accent; $("colText").value = S.text; $("colBg").value = S.bg;
+  ["Accent", "Text", "Bg"].forEach(k => $("col" + k + "V").textContent = $("col" + k).value.toUpperCase());
+  timeIds.forEach(id => { $(id).value = S[id]; $(id + "V").value = S[id].toFixed(1) + "s"; });
+  const lp = $("logoPrev"); lp.innerHTML = ""; if (logoImg) { const im = new Image(); im.src = logoImg.src; im.alt = ""; lp.appendChild(im); }
+  marks();
+}
+textIds.forEach(id => $(id).addEventListener("input", e => { S[id] = e.target.value; touch(); }));
+[0, 1, 2, 3, 4].forEach(i => $("c" + i).addEventListener("input", e => { S.cats[i] = e.target.value; touch(); }));
+[["colAccent", "accent"], ["colText", "text"], ["colBg", "bg"]].forEach(([id, k]) => $(id).addEventListener("input", e => { S[k] = e.target.value; $(id + "V").textContent = e.target.value.toUpperCase(); touch(); }));
+timeIds.forEach(id => $(id).addEventListener("input", e => { S[id] = +e.target.value; $(id + "V").value = S[id].toFixed(1) + "s"; if (T > total()) T = 0; touch(); }));
+let logoFile = null;
+$("logo").addEventListener("change", e => { const f = e.target.files[0]; if (!f) return; logoFile = f;
+  const r = new FileReader(); r.onload = () => { const im = new Image(); im.onload = () => { logoImg = im; fill(); touch(); }; im.src = r.result; }; r.readAsDataURL(f); });
+$("logoClear").onclick = () => { logoImg = null; logoFile = null; S.logoId = null; $("logo").value = ""; fill(); touch(); };
+$("reset").onclick = () => { S = structuredClone(DEFAULTS); logoImg = null; logoFile = null; $("logo").value = ""; fill(); touch(); T = 0; setPlay(true); };
+
+// ---------- save + export ----------
+const DOC = "projects/walmart-categories-v2";
+let dbRef = null, assetsNs = null, downloadsNs = null;
+$("save").onclick = async () => {
+  if (!dbRef) { status.textContent = "Saving isn't available here. Open this page signed in to claude.ai."; return; }
+  $("save").disabled = true; status.textContent = "Saving…";
+  try {
+    if (logoFile && assetsNs) { const up = await assetsNs.upload(logoFile); S.logoId = up.id; logoFile = null; }
+    await dbRef.doc(DOC).set({ ...S, cats: [...S.cats], savedAt: new Date().toISOString() });
+    dirty = false; status.textContent = logoFile ? "Saved text and colours. The logo upload needs edit access." : "Saved. Tell Claude “render final v2” in chat.";
+  } catch (err) { status.textContent = "Couldn't save: " + (err && err.message ? err.message : "please try again"); }
+  $("save").disabled = false;
+};
+$("export").onclick = async () => {
+  if (recording) return;
+  if (!cv.captureStream || typeof MediaRecorder === "undefined") { status.textContent = "This browser can't record the canvas. Try Chrome or Edge."; return; }
+  const mime = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find(m => MediaRecorder.isTypeSupported(m));
+  let rec; try { rec = new MediaRecorder(cv.captureStream(30), { mimeType: mime, videoBitsPerSecond: 12e6 }); } catch { status.textContent = "Recording isn't supported in this view."; return; }
+  const chunks = []; rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+  rec.onstop = async () => { recording = false; $("export").disabled = false; setPlay(true);
+    if (!downloadsNs) { status.textContent = "Recorded, but downloads aren't available in this view."; return; }
+    try { await downloadsNs.save({ filename: "walmart-categories-v2-preview.webm", data: new Blob(chunks, { type: "video/webm" }) }); status.textContent = "Preview downloaded."; }
+    catch (e) { status.textContent = e && e.code === "declined" ? "Download cancelled." : "Couldn't download the preview."; } };
+  recording = true; $("export").disabled = true; status.textContent = `Recording ${total().toFixed(1)}s preview…`;
+  T = 0; recStart = performance.now(); rec.start(250); setTimeout(() => rec.stop(), total() * 1000 + 150);
+};
+
+// ---------- boot ----------
+fill();
+(document.fonts ? Promise.all([document.fonts.load(font(900, 100)), document.fonts.load(font(800, 60)), document.fonts.load(font(700, 50))]).catch(() => {}) : Promise.resolve())
+  .then(() => { window.STUDIO.ready = true; requestAnimationFrame(frame); });
+(async () => {
+  if (!window.claude?.use) { $("save").disabled = true; $("note").textContent = "Saving needs claude.ai. You can still edit and preview here."; return; }
+  const [db, assets, downloads] = await Promise.all([claude.use("db"), claude.use("assets"), claude.use("downloads")]);
+  dbRef = db; assetsNs = assets; downloadsNs = downloads;
+  if (!downloads) $("export").hidden = true;
+  if (!db) { $("save").disabled = true; $("note").textContent = "Sign in to claude.ai to save edits for the final render."; return; }
+  try { const snap = await db.doc(DOC).get();
+    if (snap.exists && !dirty) { const d = snap.data(); S = { ...structuredClone(DEFAULTS), ...d, cats: Array.isArray(d.cats) ? [...d.cats] : [...DEFAULTS.cats] };
+      if (S.logoId) { const im = new Image(); im.onload = () => { logoImg = im; fill(); }; im.src = "/_blob/" + S.logoId; }
+      fill(); status.textContent = "Loaded your last saved version"; } } catch { }
+})();
+</script>
