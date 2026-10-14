@@ -1,0 +1,414 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face { font-family: "D"; font-weight: 300; src: url("file:///usr/share/fonts/opentype/inter/InterDisplay-Light.otf"); }
+  @font-face { font-family: "D"; font-weight: 400; src: url("file:///usr/share/fonts/opentype/inter/InterDisplay-Regular.otf"); }
+  @font-face { font-family: "D"; font-weight: 600; src: url("file:///usr/share/fonts/opentype/inter/InterDisplay-SemiBold.otf"); }
+  @font-face { font-family: "PF"; font-style: italic; font-weight: 400 900; src: url("fonts/PlayfairDisplay-Italic.woff2"); }
+  html, body { margin: 0; background: #fff; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c" width="1080" height="1920"></canvas>
+<script>
+// ---------------- palette: orange / white, black only as a soft charcoal accent ----------------
+const OR = "#F26B1D", OR_D = "#D9540B", OR_DD = "#A63C04", OR_L = "#FF9A55";
+const WHITE = "#FFFFFF", CHAR = "#262220", GREY = "#6E6560";
+const W = 1080, H = 1920;
+const main = document.getElementById("c"), M = main.getContext("2d");
+const mk = () => { const c = document.createElement("canvas"); c.width = W; c.height = H; return c; };
+const layer = mk(), L = layer.getContext("2d");
+const fgc = mk(), FG = fgc.getContext("2d");
+let ctx = M;
+
+// ---------------- easing ----------------
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const p = (t, s, d) => clamp((t - s) / d);
+const eOut = x => 1 - Math.pow(1 - x, 4);
+const eOut5 = x => 1 - Math.pow(1 - x, 5);
+const eIn = x => x * x * x;
+const eIO = x => x < .5 ? 16 * x ** 5 : 1 - Math.pow(-2 * x + 2, 5) / 2;
+const eBack = x => { const c1 = 1.2, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+const D2R = Math.PI / 180;
+
+// ---------------- timeline (mirrored in audio.py) ----------------
+const CARD = 1.4;
+const T = { A: 0, B: 4.0, C: 11.0, D: 15.4, end: 21.0 };
+// vertical "scroll chain": hook -> 5 cards -> ecosystem
+const CHAIN = [T.A, T.B, T.B + CARD, T.B + 2 * CARD, T.B + 3 * CARD, T.B + 4 * CARD, T.C, T.D];
+const TR = 0.62; // whip transition length
+
+// ---------------- grain ----------------
+const grain = document.createElement("canvas"); grain.width = 540; grain.height = 960;
+(() => { const g = grain.getContext("2d"), im = g.createImageData(540, 960); let s = 99991;
+  for (let i = 0; i < im.data.length; i += 4) { s = (s * 16807) % 2147483647; const v = s / 2147483647 * 255; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 255; }
+  g.putImageData(im, 0, 0); })();
+
+// ---------------- helpers ----------------
+function rrect(x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2); ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+const SANS = (w, s) => `${w} ${s}px D`;
+const SERIF = (w, s) => `italic ${w} ${s}px PF`;
+
+// per-letter reveal: rise + blur + fade, staggered (the reference's typing feel)
+function reveal(str, x, y, font, color, t0, t, o = {}) {
+  const st = o.st ?? 0.028, dur = o.dur ?? 0.55, rise = o.rise ?? 34, align = o.align || "left";
+  ctx.save(); ctx.font = font; ctx.fillStyle = color; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  const tw = ctx.measureText(str).width;
+  const x0 = align === "center" ? x - tw / 2 : align === "right" ? x - tw : x;
+  if (o.rot) { ctx.translate(x, y); ctx.rotate(o.rot); ctx.translate(-x, -y); }
+  for (let i = 0; i < str.length; i++) {
+    const pr = p(t, t0 + i * st, dur); if (pr <= 0) break;
+    const e = eOut(pr), cx = x0 + ctx.measureText(str.slice(0, i)).width;
+    const bl = (1 - e) * 10;
+    ctx.filter = bl > 0.4 ? `blur(${bl.toFixed(1)}px)` : "none";
+    ctx.globalAlpha = e * (o.alpha ?? 1);
+    ctx.fillText(str[i], cx, y + (1 - e) * rise);
+  }
+  ctx.restore();
+  return tw;
+}
+
+// tapered swoosh ribbon along a cubic bezier, drawn from u=a to u=b
+function ribbon(P, a, b, maxW, c1, c2) {
+  if (b - a <= 0.001) return;
+  const pt = u => { const v = 1 - u; return [
+    v*v*v*P[0][0] + 3*v*v*u*P[1][0] + 3*v*u*u*P[2][0] + u*u*u*P[3][0],
+    v*v*v*P[0][1] + 3*v*v*u*P[1][1] + 3*v*u*u*P[2][1] + u*u*u*P[3][1]]; };
+  const n = 80, Lp = [], Rp = [];
+  for (let k = 0; k <= n; k++) {
+    const u = lerp(a, b, k / n), q = pt(u), q2 = pt(Math.min(1, u + 0.002)), q1 = pt(Math.max(0, u - 0.002));
+    let dx = q2[0] - q1[0], dy = q2[1] - q1[1]; const m = Math.hypot(dx, dy) || 1; dx /= m; dy /= m;
+    const w = maxW * Math.pow(Math.sin(Math.PI * clamp(u)), 0.55) / 2;
+    Lp.push([q[0] - dy * w, q[1] + dx * w]); Rp.push([q[0] + dy * w, q[1] - dx * w]);
+  }
+  const g = ctx.createLinearGradient(P[0][0], P[0][1], P[3][0], P[3][1]);
+  g.addColorStop(0, c1); g.addColorStop(1, c2);
+  ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(...Lp[0]);
+  Lp.forEach(q => ctx.lineTo(...q)); Rp.reverse().forEach(q => ctx.lineTo(...q)); ctx.closePath(); ctx.fill();
+}
+
+// ---------------- icons (100x100 box around 0,0) ----------------
+function icon(name, x, y, s, color) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s / 100, s / 100);
+  ctx.fillStyle = color; ctx.strokeStyle = color; ctx.lineWidth = 8; ctx.lineCap = "round"; ctx.lineJoin = "round";
+  const circ = (cx, cy, r) => { ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill(); };
+  if (name === "customers") {
+    ctx.globalAlpha *= .55; circ(-22, -16, 13); rrect(-46, 2, 48, 34, 16); ctx.fill();
+    circ(30, -16, 13); rrect(6, 2, 48, 34, 16); ctx.fill(); ctx.globalAlpha /= .55;
+    circ(4, -22, 17); rrect(-24, 0, 56, 44, 20); ctx.fill();
+  } else if (name === "marketplace") {
+    ctx.beginPath(); ctx.moveTo(-42, -38); ctx.lineTo(42, -38); ctx.lineTo(48, -12); ctx.lineTo(-48, -12); ctx.closePath(); ctx.fill();
+    for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.arc(-36 + i * 24, -12, 12, 0, Math.PI); ctx.fill(); }
+    ctx.lineWidth = 7; ctx.strokeRect(-38, 4, 76, 38); ctx.fillRect(-12, 16, 24, 26);
+  } else if (name === "fulfillment") {
+    ctx.lineWidth = 7;
+    ctx.beginPath(); ctx.moveTo(0, -42); ctx.lineTo(40, -22); ctx.lineTo(40, 24); ctx.lineTo(0, 44); ctx.lineTo(-40, 24); ctx.lineTo(-40, -22); ctx.closePath(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-40, -22); ctx.lineTo(0, -2); ctx.lineTo(40, -22); ctx.moveTo(0, -2); ctx.lineTo(0, 44); ctx.stroke();
+    ctx.globalAlpha *= .55; ctx.beginPath(); ctx.moveTo(-20, -32); ctx.lineTo(20, -12); ctx.lineTo(20, 2); ctx.stroke();
+  } else if (name === "advertising") {
+    ctx.beginPath(); ctx.moveTo(-36, -12); ctx.lineTo(10, -36); ctx.lineTo(10, 30); ctx.lineTo(-36, 10); ctx.closePath(); ctx.fill();
+    rrect(-46, -14, 18, 26, 5); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-30, 10); ctx.lineTo(-22, 38); ctx.stroke();
+    ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(14, -3, 22, -0.7, 0.7); ctx.stroke(); ctx.beginPath(); ctx.arc(14, -3, 36, -0.7, 0.7); ctx.stroke();
+  } else if (name === "technology") {
+    ctx.lineWidth = 7; rrect(-26, -26, 52, 52, 8); ctx.stroke(); rrect(-12, -12, 24, 24, 4); ctx.fill();
+    ctx.lineWidth = 6;
+    for (let i = -1; i <= 1; i++) { const o = i * 14; ctx.beginPath();
+      ctx.moveTo(o, -26); ctx.lineTo(o, -40); ctx.moveTo(o, 26); ctx.lineTo(o, 40);
+      ctx.moveTo(-26, o); ctx.lineTo(-40, o); ctx.moveTo(26, o); ctx.lineTo(40, o); ctx.stroke(); }
+  } else if (name === "cart") {
+    ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(-46, -34); ctx.lineTo(-32, -34); ctx.lineTo(-20, 18); ctx.lineTo(34, 18); ctx.lineTo(44, -18); ctx.lineTo(-27, -18); ctx.stroke();
+    circ(-14, 34, 8); circ(28, 34, 8);
+  }
+  ctx.restore();
+}
+
+// Walmart spark: six rounded petals, tapered toward the centre (R = outer radius)
+function spark(x, y, R, color, rot = 0, prog = 1) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.fillStyle = color;
+  for (let k = 0; k < 6; k++) {
+    const pp = eBack(clamp(prog * 1.6 - k * 0.12));
+    if (pp <= 0) continue;
+    ctx.save(); ctx.rotate(k * Math.PI / 3); ctx.scale(pp, pp);
+    const ci = 0.36 * R, co = 0.82 * R, ri = 0.1 * R, ro = 0.18 * R;
+    ctx.beginPath();
+    ctx.arc(0, -co, ro, Math.PI, 0);          // outer cap
+    ctx.lineTo(ri, -ci);
+    ctx.arc(0, -ci, ri, 0, Math.PI);          // inner cap
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+// ---------------- hero: orange shopping bag with soft studio shadow ----------------
+function bag(x, y, s, rot) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.scale(s, s);
+  const body = () => { ctx.beginPath(); ctx.moveTo(-180, -200); ctx.lineTo(180, -200); ctx.lineTo(262, -232); ctx.lineTo(262, 190); ctx.lineTo(180, 222); ctx.lineTo(-180, 222); ctx.closePath(); };
+  // cast shadow (offsets are in screen space, so scale them by s)
+  ctx.save();
+  ctx.shadowColor = "rgba(120,48,6,0.34)"; ctx.shadowBlur = 90 * s; ctx.shadowOffsetX = 46 * s; ctx.shadowOffsetY = 64 * s;
+  ctx.fillStyle = OR; body(); ctx.fill(); ctx.restore();
+  // back handle
+  ctx.strokeStyle = "#F3E3D6"; ctx.lineWidth = 15; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(-40, -228); ctx.bezierCurveTo(-30, -400, 190, -400, 190, -228); ctx.stroke();
+  // inside of bag
+  ctx.fillStyle = OR_DD; ctx.beginPath(); ctx.moveTo(-180, -200); ctx.lineTo(-98, -232); ctx.lineTo(262, -232); ctx.lineTo(180, -200); ctx.closePath(); ctx.fill();
+  // gusset
+  let g = ctx.createLinearGradient(180, 0, 262, 0); g.addColorStop(0, "#C94A06"); g.addColorStop(1, "#E05A0D");
+  ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(180, -200); ctx.lineTo(262, -232); ctx.lineTo(262, 190); ctx.lineTo(180, 222); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.18)"; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(221, -216); ctx.lineTo(221, 120); ctx.lineTo(180, 222); ctx.moveTo(221, 120); ctx.lineTo(262, 190); ctx.stroke();
+  // front face
+  g = ctx.createLinearGradient(-180, -200, 180, 222); g.addColorStop(0, "#FF9450"); g.addColorStop(0.45, OR); g.addColorStop(1, "#E3590C");
+  ctx.fillStyle = g; ctx.fillRect(-180, -200, 360, 422);
+  // top fold band + studio highlight
+  ctx.fillStyle = "rgba(255,255,255,0.12)"; ctx.fillRect(-180, -200, 360, 46);
+  ctx.fillStyle = "rgba(0,0,0,0.06)"; ctx.fillRect(-180, -154, 360, 4);
+  g = ctx.createLinearGradient(-180, 0, -40, 0); g.addColorStop(0, "rgba(255,255,255,0.22)"); g.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = g; ctx.fillRect(-180, -200, 140, 422);
+  // front handle
+  ctx.strokeStyle = WHITE; ctx.lineWidth = 16;
+  ctx.beginPath(); ctx.moveTo(-95, -176); ctx.bezierCurveTo(-90, -380, 95, -380, 95, -176); ctx.stroke();
+  ctx.fillStyle = "#FFE9DA"; [[-95, -176], [95, -176]].forEach(([hx, hy]) => { ctx.beginPath(); ctx.arc(hx, hy, 11, 0, Math.PI * 2); ctx.fill(); });
+  // Walmart spark on the bag front
+  spark(0, 30, 110, WHITE);
+  ctx.restore();
+}
+
+// soft 4-petal foreground shape (out-of-focus depth layer)
+function propeller(c, x, y, size, rot, alpha) {
+  c.save(); c.translate(x, y); c.rotate(rot); c.globalAlpha = alpha;
+  c.fillStyle = OR_DD;
+  for (let k = 0; k < 4; k++) {
+    c.rotate(Math.PI / 2); c.beginPath();
+    c.ellipse(size * 0.3, 0, size * 0.3, size * 0.075, 0, 0, Math.PI * 2); c.fill();
+  }
+  c.restore();
+}
+
+// ---------------- background: warm studio vignette + giant faded emblem ----------------
+function background(t, big = 1) {
+  const g = M.createRadialGradient(540, 820, 80, 540, 900, 1350);
+  g.addColorStop(0, "#FFFFFF"); g.addColorStop(0.45, "#FFF8F2"); g.addColorStop(1, "#EAD5C4");
+  M.fillStyle = g; M.fillRect(0, 0, W, H);
+  ctx = M; M.save(); M.translate(540, 900); M.rotate(t * 0.03); M.scale(big, big);
+  M.globalAlpha = 0.07; M.strokeStyle = OR; M.fillStyle = OR; M.lineWidth = 46;
+  M.beginPath(); M.arc(0, 0, 420, 0, Math.PI * 2); M.stroke();
+  M.lineWidth = 8; M.beginPath(); M.arc(0, 0, 330, 0, Math.PI * 2); M.stroke();
+  for (let k = 0; k < 24; k++) { M.rotate(Math.PI / 12); M.beginPath(); M.arc(375, 0, 9, 0, Math.PI * 2); M.fill(); }
+  spark(0, 0, 270, OR);
+  M.restore(); M.globalAlpha = 1;
+}
+
+// ======================= SCENE A — hook =======================
+function sceneA(t) {
+  const lt = t - T.A;
+  // swoosh behind the bag
+  ribbon([[-140, 1180], [330, 760], [720, 1460], [1220, 1080]], 0, eIO(p(lt, 1.15, 1.0)), 120, OR_L, OR_D);
+  // tumbling minis in the corners
+  const m1 = eOut5(p(lt, 1.6, 1.2)), m2 = eOut5(p(lt, 1.9, 1.2));
+  if (m1 > 0) bag(lerp(1250, 990, m1), 150 + Math.sin(lt * 1.4) * 10, 0.24, lerp(-1.2, -0.35, m1) + lt * 0.05);
+  if (m2 > 0) bag(lerp(-200, 90, m2), 1790 + Math.sin(lt * 1.2) * 10, 0.22, lerp(1.4, 0.5, m2) - lt * 0.04);
+  // hero enters tumbling from lower left, settles
+  const e = eOut5(p(lt, 0.15, 1.25));
+  bag(lerp(150, 520, e), lerp(1500, 960, e) + Math.sin(lt * 1.6) * 8, lerp(0.6, 0.88, e), lerp(-0.75, -0.07, e) + Math.sin(lt * 1.1) * 0.012);
+  // copy — top right
+  reveal("What makes", 975, 345, SANS(300, 54), GREY, 0.55, lt, { align: "right", rot: lerp(-0.12, -0.04, eOut(p(lt, 0.55, 1.2))) });
+  reveal("Walmart", 990, 470, SERIF(800, 150), CHAR, 0.85, lt, { align: "right", st: 0.045, rise: 50, rot: lerp(-0.12, -0.04, eOut(p(lt, 0.85, 1.2))) });
+  // copy — bottom left
+  reveal("a big", 100, 1500, SANS(300, 56), GREY, 1.55, lt);
+  reveal("Opportunity?", 80, 1640, SERIF(800, 132), OR_D, 1.75, lt, { st: 0.04, rise: 50 });
+}
+
+// ======================= SCENE B — the five pieces, as stacked cards =======================
+const PIECES = [["Customers", "customers"], ["Marketplace", "marketplace"], ["Fulfillment", "fulfillment"], ["Advertising", "advertising"], ["Technology", "technology"]];
+function card(i, lt) {
+  const dir = i % 2 ? 1 : -1;
+  const settle = eOut5(p(lt, -0.15, 0.9));
+  const cx = 540, cy = 1030, w = 640, h = 830;
+  // ribbon peeking from the side, behind the card
+  const rb = eIO(p(lt, -0.1, 0.8));
+  if (dir > 0) ribbon([[1240, 560], [880, 760], [1000, 1250], [620, 1500]], 0, rb, 110, OR_L, OR_D);
+  else ribbon([[-160, 600], [200, 820], [80, 1280], [460, 1520]], 0, rb, 110, OR_L, OR_D);
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(dir * lerp(5, 0.8, settle) * D2R);
+  ctx.save(); ctx.shadowColor = "rgba(120,48,6,0.33)"; ctx.shadowBlur = 80; ctx.shadowOffsetX = 30; ctx.shadowOffsetY = 50;
+  ctx.fillStyle = OR; rrect(-w / 2, -h / 2, w, h, 44); ctx.fill(); ctx.restore();
+  rrect(-w / 2, -h / 2, w, h, 44); ctx.save(); ctx.clip();
+  const warm = i % 2 === 0;
+  let g = ctx.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2);
+  if (warm) { g.addColorStop(0, "#FF9C5B"); g.addColorStop(0.55, OR); g.addColorStop(1, "#D9500A"); }
+  else { g.addColorStop(0, "#FFFFFF"); g.addColorStop(1, "#FFE3CF"); }
+  ctx.fillStyle = g; ctx.fillRect(-w / 2, -h / 2, w, h);
+  // ken-burns inner content
+  const kb = lerp(1.12, 1.0, eOut(p(lt, -0.2, CARD + 0.4)));
+  ctx.scale(kb, kb);
+  const ink = warm ? WHITE : OR, soft = warm ? "rgba(255,255,255," : "rgba(242,107,29,";
+  for (let k = 0; k < 4; k++) {
+    ctx.strokeStyle = soft + (0.16 - k * 0.03) + ")"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(0, -10, 150 + k * 70 + Math.sin(lt * 2 + k) * 6, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.fillStyle = soft + "0.16)"; ctx.beginPath(); ctx.arc(0, -10, 175, 0, Math.PI * 2); ctx.fill();
+  icon(PIECES[i][1], 0, -10 + Math.sin(lt * 2.2) * 6, 230 * eBack(p(lt, 0.05, 0.7)), ink);
+  // studio light sweep
+  const sw = lerp(-700, 700, eIO(p(lt, 0.2, 1.1)));
+  g = ctx.createLinearGradient(sw - 120, -400, sw + 120, 400);
+  g.addColorStop(0, "rgba(255,255,255,0)"); g.addColorStop(0.5, "rgba(255,255,255,0.28)"); g.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = g; ctx.fillRect(-w, -h, w * 2, h * 2);
+  ctx.restore();
+  reveal(`0${i + 1}`, -w / 2 + 44, h / 2 - 44, SANS(600, 34), warm ? "rgba(255,255,255,0.9)" : OR_D, 0.3, lt);
+  ctx.restore();
+  // caption above: "Customers", "+ Marketplace", ...
+  const capY = 520;
+  if (i > 0) {
+    ctx.font = SERIF(700, 96); const cw = ctx.measureText(PIECES[i][0]).width;
+    reveal("+", 540 - cw / 2 - 30, capY - 4, SANS(300, 90), OR, 0.05, lt, { align: "right" });
+  }
+  reveal(PIECES[i][0], 540, capY, SERIF(700, 96), CHAR, 0.12, lt, { align: "center", st: 0.035 });
+}
+
+// ======================= SCENE C — ecosystem around the seller =======================
+function sceneC(t) {
+  const lt = t - T.C;
+  const cy = 1000, R = 330;
+  // dotted circle drawing on
+  const dp = eIO(p(lt, 0.35, 1.1));
+  ctx.save(); ctx.strokeStyle = OR; ctx.lineWidth = 5; ctx.setLineDash([3, 16]); ctx.lineCap = "round"; ctx.lineDashOffset = -lt * 30;
+  ctx.beginPath(); ctx.arc(540, cy, R, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * dp); ctx.stroke(); ctx.restore();
+  // the seller (bag) in the centre
+  const e = eOut5(p(lt, -0.2, 1.0));
+  bag(510, cy + 30 + Math.sin(lt * 1.6) * 6, lerp(0.45, 0.56, e), lerp(0.25, -0.05, e));
+  // the five pieces orbit around it
+  for (let i = 0; i < 5; i++) {
+    const a = (-90 + i * 72 + lt * 9) * D2R, cp = eBack(p(lt, 0.7 + i * 0.13, 0.6));
+    if (cp <= 0) continue;
+    const x = 540 + Math.cos(a) * R, y = cy + Math.sin(a) * R;
+    ctx.save(); ctx.translate(x, y); ctx.scale(cp, cp);
+    ctx.shadowColor = "rgba(120,48,6,0.3)"; ctx.shadowBlur = 30; ctx.shadowOffsetY = 14;
+    const g = ctx.createLinearGradient(-60, -60, 60, 60); g.addColorStop(0, OR_L); g.addColorStop(1, OR_D);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 66, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowColor = "transparent";
+    ctx.strokeStyle = WHITE; ctx.lineWidth = 5; ctx.stroke();
+    icon(PIECES[i][1], 0, 0, 76, WHITE);
+    ctx.restore();
+  }
+  reveal("Multiple pieces of an", 540, 420, SANS(300, 52), GREY, 0.15, lt, { align: "center", st: 0.02 });
+  reveal("e-commerce ecosystem", 540, 530, SERIF(700, 92), CHAR, 0.55, lt, { align: "center", st: 0.03 });
+  reveal("already exist around", 540, 1480, SANS(300, 52), GREY, 1.55, lt, { align: "center", st: 0.02 });
+  reveal("the seller.", 540, 1625, SERIF(800, 138), OR_D, 1.95, lt, { align: "center", st: 0.045, rise: 50 });
+  const up = eIO(p(lt, 2.6, 0.7));
+  if (up > 0) ribbon([[270, 1672], [450, 1640], [640, 1700], [820, 1650]], 0, up, 16, OR, OR_D);
+}
+
+// ======================= SCENE D — close-up + call to action =======================
+function sceneD(t) {
+  const lt = t - T.D;
+  const push = lerp(1.0, 1.06, eIO(p(lt, 0, 5.6)));
+  ctx.save(); ctx.translate(540, 960); ctx.scale(push, push); ctx.translate(-540, -960);
+  bag(20, 1120 + Math.sin(lt * 1.3) * 6, 1.5, -0.06);
+  ctx.restore();
+  const x = 1015;
+  spark(x - 70, 450, 72, OR, lt * 0.12, p(lt, 0.15, 0.9));
+  reveal("Explore", x, 610, SANS(300, 74), GREY, 0.35, lt, { align: "right" });
+  reveal("the", x - 360, 720, SANS(300, 46), GREY, 0.75, lt, { align: "right" });
+  reveal("Opportunity", x, 830, SERIF(800, 108), OR_D, 0.9, lt, { align: "right", st: 0.035, rise: 50 });
+  reveal("behind", x, 940, SANS(300, 60), GREY, 1.45, lt, { align: "right" });
+  reveal("Walmart", x, 1085, SERIF(800, 128), CHAR, 1.75, lt, { align: "right", st: 0.04, rise: 50 });
+  reveal("Marketplace.", x, 1215, SERIF(700, 96), OR_D, 2.15, lt, { align: "right", st: 0.035, rise: 50 });
+  const up = eIO(p(lt, 2.9, 0.8));
+  if (up > 0) ribbon([[520, 1262], [690, 1232], [860, 1292], [1030, 1248]], 0, up, 18, OR, OR_D);
+}
+
+// ======================= compositor =======================
+function chainOffset(k, t) {
+  // scene k occupies [CHAIN[k], CHAIN[k+1]]; enters from below, exits upward
+  const enter = k === 0 ? 1 : eIO(p(t, CHAIN[k] - TR / 2, TR));
+  const exit = k >= CHAIN.length - 2 ? 0 : eIO(p(t, CHAIN[k + 1] - TR / 2, TR));
+  return H * (1 - enter) - H * exit;
+}
+function chainVel(k, t) { if (k === undefined) return 0; const d = 1 / 120; return (chainOffset(k, t + d) - chainOffset(k, t - d)) / (2 * d); }
+function drawLayer(fn, t, offY, opts = {}) {
+  ctx = L; L.setTransform(1, 0, 0, 1, 0, 0); L.clearRect(0, 0, W, H);
+  L.save();
+  if (opts.zoom) { L.translate(540, 960); L.scale(opts.zoom, opts.zoom); L.translate(-540, -960); }
+  fn(t); L.restore();
+  ctx = M;
+  // vertical motion blur: smear samples along the direction of travel
+  const v = chainVel(opts.k, t), smear = Math.min(110, Math.abs(v) * 0.05), a = opts.alpha ?? 1;
+  M.save();
+  if (opts.blur) M.filter = `blur(${opts.blur.toFixed(1)}px)`;
+  if (smear <= 4) { M.globalAlpha = a; M.drawImage(layer, 0, offY); }
+  else {
+    // accumulate many faint samples (with a touch of blur) for a smooth streak
+    const n = 18; M.filter = `blur(${(2 + smear / 25).toFixed(1)}px)`;
+    for (let s = 0; s < n; s++) { M.globalAlpha = a / (s + 1); M.drawImage(layer, 0, offY + (s / (n - 1) - 0.5) * smear); }
+  }
+  M.restore();
+}
+// how far the chain has scrolled (drives foreground parallax)
+function scrollAmount(t) { let s = 0; for (let k = 1; k < CHAIN.length - 1; k++) s += eIO(p(t, CHAIN[k] - TR / 2, TR)); return s; }
+
+const SCENES = [sceneA, ...PIECES.map((_, i) => (tt => card(i, tt - CHAIN[i + 1]))), sceneC];
+function render(t) {
+  M.setTransform(1, 0, 0, 1, 0, 0); M.globalAlpha = 1; M.filter = "none";
+  background(t, lerp(1, 1.5, eIO(p(t, T.D - 0.3, 0.8))));
+
+  for (let k = 0; k < SCENES.length; k++) {
+    if (t < CHAIN[k] - TR / 2 - 0.01 || t > CHAIN[k + 1] + TR / 2 + 0.01) continue;
+    const off = chainOffset(k, t);
+    if (k === SCENES.length - 1) {
+      // ecosystem -> close-up: push through with blur
+      const zp = eIn(p(t, T.D - 0.35, 0.55));
+      if (zp >= 1) continue;
+      drawLayer(SCENES[k], t, off, { k, zoom: 1 + zp * 2.2, alpha: 1 - eIn(p(t, T.D - 0.15, 0.35)), blur: zp * 22 });
+    } else drawLayer(SCENES[k], t, off, { k });
+  }
+  if (t > T.D - 0.2) {
+    const zi = eOut5(p(t, T.D - 0.2, 0.9));
+    drawLayer(sceneD, t, 0, { zoom: lerp(1.35, 1, zi), alpha: clamp(p(t, T.D - 0.2, 0.3)), blur: (1 - zi) * 16 });
+  }
+
+  // progress pips while the five pieces scroll by
+  const pipsA = clamp(p(t, T.B - 0.1, 0.3)) * (1 - p(t, T.C - 0.3, 0.3));
+  if (pipsA > 0) {
+    const f = clamp((t - T.B) / CARD, 0, 4.999);
+    M.save(); M.globalAlpha = pipsA; ctx = M;
+    let x = 540 - 130;
+    for (let i = 0; i < 5; i++) {
+      const act = clamp(1 - Math.abs(f - 0.5 - i) * 1.4), w = 18 + 44 * act;
+      M.fillStyle = act > 0.05 ? OR : "rgba(242,107,29,0.28)"; rrect(x, 1600, w, 16, 8); M.fill();
+      x += w + 14;
+    }
+    M.restore();
+  }
+
+  // out-of-focus foreground shapes with parallax
+  FG.setTransform(1, 0, 0, 1, 0, 0); FG.clearRect(0, 0, W, H);
+  const sc = scrollAmount(t), fgA = clamp(p(t, 2.8, 0.8)) * (1 - 0.6 * p(t, T.D, 0.8));
+  if (fgA > 0) {
+    [[-90, 300, 480, 0.0], [1160, 1250, 440, 1.3]].forEach(([x, y, s, ph], j) => {
+      let yy = y - sc * (380 + j * 60);
+      yy = ((yy + 400) % (H + 800) + (H + 800)) % (H + 800) - 400;
+      propeller(FG, x + Math.sin(t * 0.5 + ph) * 20, yy, s, t * 0.35 * (j % 2 ? 1 : -1) + ph + sc * 0.6, 0.72 * fgA);
+    });
+    M.save(); M.filter = "blur(18px)"; M.drawImage(fgc, 0, 0); M.restore();
+  }
+
+  M.save(); M.globalAlpha = 0.03; M.globalCompositeOperation = "overlay"; M.drawImage(grain, 0, 0, W, H); M.restore();
+  const fo = p(t, T.end - 0.7, 0.7);
+  if (fo > 0) { M.fillStyle = `rgba(255,250,246,${eIO(fo)})`; M.fillRect(0, 0, W, H); }
+}
+window.render = render; window.T = T;
+window.ready = Promise.all(["300 50px D", "400 50px D", "600 50px D", "italic 700 50px PF", "italic 800 50px PF"].map(f => document.fonts.load(f)));
+</script>
+</body>
+</html>
