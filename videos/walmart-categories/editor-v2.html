@@ -313,7 +313,7 @@ function hook(t, D, i, o) {
 function categories(t, D, i, o) {
   const pos = [[-40, -90], [50, 30], [-40, 90], [40, -40], [0, 30]];
   const tt = Math.max(0, t), span = 700, seg = (D - 0.3) / 5, si = Math.min(5, Math.floor(tt / seg)), fr = si >= 5 ? 1 : cl((tt - si * seg) / seg);
-  const camZ = 760 + span * (si - 1 + (si >= 5 ? 1 + (tt - 5 * seg) / 0.3 * 0.5 : eo(fr)));
+  const camZ = 760 + span * (si >= 5 ? 4 + (tt - 5 * seg) * 0.12 : si - 1 + eo(fr));
   scene(t, D, () => {
     const items = S.cats.map((c, k) => ({ c, k, d: 760 + k * span - camZ })).filter(q => q.d > -440 && q.d < 4000).sort((a, b) => b.d - a.d);
     // giant outline watermark of the card in focus
