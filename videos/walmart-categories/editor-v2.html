@@ -105,9 +105,10 @@ textarea { resize: vertical; min-height: 62px; }
       <section class="card">
         <h2>Scene 1 · Hook <small id="d1"></small></h2>
         <div class="fields">
+          <label class="f full"><span>Top tag</span><input type="text" id="pill"></label>
           <label class="f"><span>Heading line 1 (zooms in)</span><input type="text" id="h1"></label>
           <label class="f"><span>Heading line 2</span><input type="text" id="h2"></label>
-          <label class="f full"><span>Typed in the search bar (orange)</span><input type="text" id="h3"></label>
+          <label class="f full"><span>Orange highlight (ends the sentence)</span><input type="text" id="h3"></label>
         </div>
       </section>
       <section class="card">
@@ -182,7 +183,7 @@ const P2D = Object.fromEntries(Object.entries(ICONS).map(([k, d]) => [k, new Pat
 const CAT_ICONS = ["smartphone", "sparkles", "house", "shirt", "heart"];
 
 const DEFAULTS = {
-  h1: "Walmart isn't", h2: "Just about", h3: "Groceries",
+  pill: "Walmart Marketplace", h1: "Walmart isn't", h2: "Just about", h3: "Groceries",
   cats: ["Electronics", "Beauty", "Home", "Fashion", "Health & Wellness"],
   body: "Thousands of businesses sell across categories through", bodyHi: "Walmart Marketplace",
   t1: "See where", t2: "Your product", t3: "Could fit", url: "www.eskillvisor.com",
@@ -245,10 +246,9 @@ function track(text, y, size, color, t, at, dur = 0.8, glow = 0) {
   txt(text, W / 2, y, size, 900, color, Math.min(1, k * 1.6), lerp(36, -2, e)); ctx.restore(); blur(0);
 }
 // scene wrapper: zoom-blur in and out
-function scene(t, D, draw, first, last) {
-  const i = first ? 1 : eo(prog(t, 0, 0.45)), o = last ? 0 : ei(prog(t, D - 0.4, 0.4));
-  const s = lerp(0.86, 1, i) * lerp(1, 1.4, o) * (1 + 0.025 * t / D);
-  ctx.save(); gA = Math.min(i, 1 - o); sBlur = (1 - i) * 18 + o * 24;
+function scene(t, D, draw, i, o) {
+  const s = lerp(0.93, 1, i) * lerp(1, 1.1, o) * (1 + 0.02 * cl(t / D));
+  ctx.save(); gA = i * (1 - o); sBlur = (1 - i) * 10 + o * 12;
   ctx.translate(W / 2, H / 2); ctx.scale(s, s); ctx.translate(-W / 2, -H / 2);
   draw(); ctx.restore(); gA = 1; sBlur = 0; ctx.filter = "none";
 }
@@ -267,144 +267,177 @@ function background(T) {
 }
 
 // ---------- scene 1: hook ----------
-function hook(t, D) {
+function chip(i, label, h = 112) {
+  const fs = 40, lw = measure(label, fs, 700), w = 132 + lw;
+  glass(0, 0, w, h, h / 2, 0.14, 1);
+  rr(18, 18, h - 36, h - 36, (h - 36) / 2); ctx.fillStyle = mix(S.accent, S.bg, 0.88); ctx.fill();
+  icon(CAT_ICONS[i], 18 + (h - 36) / 2 - 22, h / 2 - 22, 44, S.accent, 2.2);
+  txt(label, h - 2, h / 2 + 2, fs, 700, S.text, 1, 0, "left", "middle");
+  return w;
+}
+function marquee(t, y, dir, a) {
+  const gap = 26, ws = S.cats.map(c => 132 + measure(c, 40, 700)), loop = ws.reduce((p, w) => p + w + gap, 0);
+  let x = -((t * 110 * dir) % loop + loop) % loop - loop;
+  ctx.save(); const g0 = gA; gA = g0 * a;
+  while (x < W + loop) { S.cats.forEach((c, i) => { ctx.save(); ctx.translate(x, y); chip(i, c); ctx.restore(); x += ws[i] + gap; }); }
+  gA = g0; ctx.restore();
+}
+function hook(t, D, i, o) {
   scene(t, D, () => {
-    // giant line 1 pulls back from the camera
-    const k = prog(t, 0, 1.05), e = eo(k);
-    const l1 = S.h1.toUpperCase(), s1 = fitSize(l1, 900, 104, 1000, -2);
-    ctx.save(); ctx.translate(540, 640 + s1 / 2); ctx.scale(lerp(4.5, 1, e), lerp(4.5, 1, e)); ctx.translate(-540, -(640 + s1 / 2));
-    blur((1 - e) * 10); txt(l1, W / 2, 640, s1, 900, S.text, Math.min(1, k * 3), -2); ctx.restore(); blur(0);
-    track(S.h2.toUpperCase(), 760, 104, S.text, t, 0.55, 0.8);
-    // search bar types the highlight
-    const b = prog(t, 1.15, 0.6); if (!b) return; const be = eo(b);
-    const bx = 100, bw = 880, bh = 160, by = 950 + 70 * (1 - be);
-    ctx.save(); blur((1 - be) * 10); glass(bx, by, bw, bh, 80, 0.30, b); blur(0);
-    alpha(b); icon("search", bx + 52, by + 48, 64, S.accent, 2.4);
-    const word = S.h3.toUpperCase(), size = fitSize(word, 900, 84, bw - 230, 1);
-    const n = Math.floor(Math.max(0, t - 1.7) / 0.075), shown = word.slice(0, n);
-    txt(shown, bx + 150, by + bh / 2 + 4, size, 900, S.accent, b, 1, "left", "middle");
-    const cw = measure(shown, size, 900, 1);
-    caret(bx + 152 + cw + 6, by + 42, bh - 84, t, n > 0 && n < word.length);
-    ctx.restore();
-    // sparkle pops when typing completes
-    const done = 1.7 + word.length * 0.075, sp = prog(t, done + 0.05, 0.5);
-    if (sp > 0) { const s = back(sp); ctx.save(); alpha(cl(sp * 2) * (1 - prog(t, done + 0.9, 0.4)));
-      ctx.translate(bx + bw - 40, by - 10); ctx.scale(s, s); icon("sparkles", -36, -36, 72, S.accent, 2); ctx.restore(); }
-  }, true, false);
+    // tag pill
+    const pk = prog(t, 0.05, 0.6), pe = eo(pk), pillT = S.pill.toUpperCase();
+    const tw = measure(pillT, 34, 800, 4), pw = tw + 100 + 48, px = W / 2 - pw / 2, py = 420 + 30 * (1 - pe);
+    if (pk) { glass(px, py, pw, 96, 48, 0.25, pk); alpha(pk); icon("store", px + 38, py + 25, 46, S.accent, 2.3);
+      txt(pillT, px + 100, py + 50, 34, 800, S.accent, pk, 4, "left", "middle"); }
+    // line 1 pulls back from the camera
+    const k = prog(t, 0, 1.05), e = eo(k), l1 = S.h1.toUpperCase(), s1 = fitSize(l1, 900, 132, 1010, -3);
+    ctx.save(); ctx.translate(540, 580 + s1 / 2); const z = lerp(4.2, 1, e); ctx.scale(z, z); ctx.translate(-540, -(580 + s1 / 2));
+    blur((1 - e) * 10); txt(l1, W / 2, 580, s1, 900, S.text, Math.min(1, k * 3), -3); ctx.restore(); blur(0);
+    track(S.h2.toUpperCase(), 580 + s1 * 1.08, 132, S.text, t, 0.45, 0.8);
+    // highlight word completes the sentence
+    const h3 = S.h3.toUpperCase(), s3 = fitSize(h3, 900, 176, 1010, -3), y3 = 580 + s1 * 2.16;
+    const hk = prog(t, 0.9, 0.75);
+    if (hk) { const he = eo(hk); ctx.save(); ctx.translate(540, y3 + s3 / 2); const hz = lerp(1.6, 1, he); ctx.scale(hz, hz); ctx.translate(-540, -(y3 + s3 / 2));
+      blur((1 - he) * 14); ctx.shadowColor = rgba(S.accent, 0.3); ctx.shadowBlur = 40; txt(h3, 540, y3, s3, 900, S.accent, Math.min(1, hk * 2), -3); ctx.restore(); blur(0);
+      const uw = Math.min(700, measure(h3, s3, 900, -3) * 0.8), ur = eo(prog(t, 1.4, 0.6));
+      if (ur) { alpha(1); rr(540 - uw / 2, y3 + s3 * 1.1, uw * ur, 16, 8); ctx.fillStyle = S.accent; ctx.fill(); } }
+    // category chips stream along the bottom
+    const ma = eo(prog(t, 1.2, 0.8));
+    if (ma) { marquee(t, 1360, 1, ma); marquee(t + 3.7, 1500, -1, ma * 0.85);
+      const fade = (x0, x1) => { const g = ctx.createLinearGradient(x0, 0, x1, 0); g.addColorStop(0, rgba(S.bg, 1)); g.addColorStop(1, rgba(S.bg, 0)); ctx.globalAlpha = gA; ctx.fillStyle = g; };
+      fade(0, 180); ctx.fillRect(0, 1340, 180, 300); fade(W, W - 180); ctx.fillRect(W - 180, 1340, 180, 300); }
+  }, i, o);
 }
 
 // ---------- scene 2: categories fly past in depth ----------
-function categories(t, D) {
-  const pos = [[-60, -120], [70, 40], [-60, 120], [60, -60], [0, 40]];
-  const span = 650, seg = (D - 0.3) / 5, si = Math.min(5, Math.floor(t / seg)), fr = si >= 5 ? 1 : cl((t - si * seg) / seg);
-  const camZ = 700 + span * (si - 1 + (si >= 5 ? 1 + (t - 5 * seg) / 0.3 * 0.6 : eo(fr)));
+function categories(t, D, i, o) {
+  const pos = [[-40, -90], [50, 30], [-40, 90], [40, -40], [0, 30]];
+  const tt = Math.max(0, t), span = 700, seg = (D - 0.3) / 5, si = Math.min(5, Math.floor(tt / seg)), fr = si >= 5 ? 1 : cl((tt - si * seg) / seg);
+  const camZ = 760 + span * (si - 1 + (si >= 5 ? 1 + (tt - 5 * seg) / 0.3 * 0.5 : eo(fr)));
   scene(t, D, () => {
-    const items = S.cats.map((c, i) => ({ c, i, d: 700 + i * span - camZ })).filter(o => o.d > -420 && o.d < 3800).sort((a, b) => b.d - a.d);
-    items.forEach(({ c, i, d }) => {
-      const sc = 900 / (900 + d), [ox, oy] = pos[i];
-      const a = cl((3600 - d) / 900) * cl((d + 420) / 260);
+    const items = S.cats.map((c, k) => ({ c, k, d: 760 + k * span - camZ })).filter(q => q.d > -440 && q.d < 4000).sort((a, b) => b.d - a.d);
+    // giant outline watermark of the card in focus
+    const near = items.reduce((m, q) => Math.abs(q.d) < Math.abs(m.d) ? q : m, { d: 1e9 });
+    if (near.c) { const wm = near.c.toUpperCase(), ws = fitSize(wm, 900, 230, 1040, -4), wa = cl(1 - Math.abs(near.d) / 500) * 0.22;
+      ctx.save(); alpha(wa); ctx.font = font(900, ws); ctx.letterSpacing = "-4px"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.lineWidth = 3; ctx.strokeStyle = S.accent; ctx.strokeText(wm, 540, 560); ctx.strokeText(wm, 540, 1380); ctx.letterSpacing = "0px"; ctx.restore(); }
+    items.forEach(({ c, k, d }) => {
+      const sc = 900 / (900 + d), [ox, oy] = pos[k];
+      const a = cl((3800 - d) / 900) * cl((d + 440) / 260);
       const bl = d > 120 ? Math.min(16, (d - 120) / 110) : d < -60 ? Math.min(22, (-60 - d) / 14) : 0;
-      const w = 600, h = 190, px = 540 + ox * sc * 1.1, py = 960 + oy * sc * 1.1;
+      const w = 860, h = 270, px = 540 + ox * sc, py = 960 + oy * sc;
       ctx.save(); ctx.translate(px, py); ctx.scale(sc, sc); ctx.translate(-w / 2, -h / 2); blur(bl);
-      glass(0, 0, w, h, 52, 0.25, a);
-      alpha(a); rr(30, 30, 130, 130, 36); ctx.fillStyle = mix(S.accent, S.bg, 0.88); ctx.fill();
-      icon(CAT_ICONS[i], 55, 55, 80, S.accent, 2.1);
-      const fs = fitSize(c, 800, 60, w - 220);
-      txt(c, 190, h / 2 + 3, fs, 800, S.text, a, -1, "left", "middle");
+      glass(0, 0, w, h, 70, 0.26, a);
+      alpha(a); rr(40, 40, 190, 190, 52); ctx.fillStyle = mix(S.accent, S.bg, 0.88); ctx.fill();
+      icon(CAT_ICONS[k], 77, 77, 116, S.accent, 2.0);
+      const fs = fitSize(c, 800, 86, w - 320, -2);
+      txt(c, 272, h / 2 + 4, fs, 800, S.text, a, -2, "left", "middle");
       ctx.restore(); blur(0);
     });
-  }, false, false);
+    // progress pills
+    const act = Math.min(4, Math.max(0, Math.round((camZ - 760) / span)));
+    for (let q = 0, x = 540 - (4 * 26 + 70) / 2; q < 5; q++) { const on = q === act, w = on ? 70 : 18;
+      alpha(on ? 1 : 0.35); rr(x, 1200, w, 18, 9); ctx.fillStyle = on ? S.accent : mix(S.text, S.bg, 0.7); ctx.fill(); x += w + 26 - (on ? 0 : 0); }
+  }, i, o);
 }
 
 // ---------- scene 3: marketplace orbit ----------
-function panel(i, label) {
+function panel(k, label) {
   const w = 340, h = 250;
   glass(0, 0, w, h, 28, 0.2, 1);
-  ["#FF5F57", "#FEBC2E", "#28C840"].forEach((c, k) => { ctx.fillStyle = mix(k === 0 ? S.accent : S.text, S.bg, k === 0 ? 0.2 : 0.8); ctx.beginPath(); ctx.arc(24 + k * 20, 22, 6, 0, 7); ctx.fill(); });
+  [0, 1, 2].forEach(q => { ctx.fillStyle = mix(q === 0 ? S.accent : S.text, S.bg, q === 0 ? 0.2 : 0.8); ctx.beginPath(); ctx.arc(24 + q * 20, 22, 6, 0, 7); ctx.fill(); });
   rr(22, 48, 76, 76, 20); ctx.fillStyle = mix(S.accent, S.bg, 0.88); ctx.fill();
-  icon(CAT_ICONS[i], 36, 62, 48, S.accent, 2.2);
+  icon(CAT_ICONS[k], 36, 62, 48, S.accent, 2.2);
   const fs = fitSize(label, 800, 34, w - 130); txt(label, 114, 86, fs, 800, S.text, 1, -0.5, "left", "middle");
   ctx.fillStyle = mix(S.text, S.bg, 0.9); rr(22, 146, 296, 14, 7); ctx.fill(); rr(22, 172, 210, 14, 7); ctx.fill();
   rr(22, 200, 128, 34, 17); ctx.fillStyle = S.accent; ctx.fill();
   icon("arrow", 70, 205, 24, "#FFFFFF", 2.6);
 }
-function hub(t, D) {
-  const cx = 540, cy = 780;
+function hub(t, D, i, o) {
+  const cx = 540, cy = 760;
   scene(t, D, () => {
-    // pulse rings
-    for (let r = 0; r < 3; r++) { const ph = ((t * 0.55 + r / 3) % 1), on = prog(t, 0.2, 0.4);
-      alpha(on * (1 - ph) * 0.55); ctx.lineWidth = 3; ctx.strokeStyle = S.accent; ctx.beginPath(); ctx.arc(cx, cy, 170 + ph * 470, 0, 7); ctx.stroke(); }
+    for (let r = 0; r < 3; r++) { const ph = (((t * 0.55 + r / 3) % 1) + 1) % 1, on = prog(t, 0.2, 0.4);
+      alpha(on * (1 - ph) * 0.5); ctx.lineWidth = 3; ctx.strokeStyle = S.accent; ctx.beginPath(); ctx.arc(cx, cy, 200 + ph * 480, 0, 7); ctx.stroke(); }
     alpha(1);
-    const ps = S.cats.map((c, i) => { const a = (-90 + i * 72 + t * 16) * Math.PI / 180; return { c, i, x: Math.cos(a) * 360, z: Math.sin(a) }; }).sort((a, b) => a.z - b.z);
-    const drawPanel = p => { const k = prog(t, 0.2 + p.i * 0.12, 0.8); if (!k) return; const e = eo(k);
-      const depth = (p.z + 1) / 2, sc = lerp(0.6, 0.86, depth) * lerp(0.3, 1, e);
-      const x = cx + p.x * e, y = cy + p.z * 235 * e;
-      ctx.save(); ctx.translate(x, y); ctx.scale(sc, sc); ctx.translate(-170, -125); blur((1 - depth) * 3.5 + (1 - e) * 14);
-      const g0 = gA; gA = g0 * Math.min(1, k * 2); panel(p.i, p.c); gA = g0; ctx.restore(); blur(0); };
+    const ps = S.cats.map((c, k) => { const a = (-90 + k * 72 + t * 16) * Math.PI / 180; return { c, k, x: Math.cos(a) * 365, z: Math.sin(a) }; }).sort((a, b) => a.z - b.z);
+    const drawPanel = p => { const k = prog(t, 0.15 + p.k * 0.1, 0.8); if (!k) return; const e = eo(k);
+      const depth = (p.z + 1) / 2, sc = lerp(0.72, 1.0, depth) * lerp(0.3, 1, e);
+      const x = cx + p.x * e, y = cy + p.z * 245 * e;
+      ctx.save(); ctx.translate(x, y); ctx.scale(sc, sc); ctx.translate(-170, -125); blur((1 - depth) * 3 + (1 - e) * 14);
+      const g0 = gA; gA = g0 * Math.min(1, k * 2); panel(p.k, p.c); gA = g0; ctx.restore(); blur(0); };
     ps.filter(p => p.z < 0).forEach(drawPanel);
-    // centre disc
-    const ck = prog(t, 0.05, 0.75);
+    const ck = prog(t, 0.0, 0.75);
     if (ck > 0) { const s = back(ck); ctx.save(); ctx.translate(cx, cy); ctx.scale(s, s); alpha(1);
-      ctx.shadowColor = rgba(S.accent, 0.45); ctx.shadowBlur = 70; ctx.beginPath(); ctx.arc(0, 0, 160, 0, 7); ctx.fillStyle = S.bg; ctx.fill();
-      ctx.shadowColor = "transparent"; ctx.lineWidth = 6; ctx.strokeStyle = S.accent; ctx.stroke();
-      if (logoImg) { const m = 210, r = Math.min(m / logoImg.width, m / logoImg.height); ctx.drawImage(logoImg, -logoImg.width * r / 2, -logoImg.height * r / 2, logoImg.width * r, logoImg.height * r); }
-      else icon("cart", -72, -72, 144, S.accent, 2);
+      ctx.shadowColor = rgba(S.accent, 0.45); ctx.shadowBlur = 80; ctx.beginPath(); ctx.arc(0, 0, 190, 0, 7); ctx.fillStyle = S.bg; ctx.fill();
+      ctx.shadowColor = "transparent"; ctx.lineWidth = 7; ctx.strokeStyle = S.accent; ctx.stroke();
+      if (logoImg) { const m = 250, r = Math.min(m / logoImg.width, m / logoImg.height); ctx.drawImage(logoImg, -logoImg.width * r / 2, -logoImg.height * r / 2, logoImg.width * r, logoImg.height * r); }
+      else icon("cart", -86, -86, 172, S.accent, 2);
       ctx.restore(); }
     ps.filter(p => p.z >= 0).forEach(drawPanel);
-    // body copy, word by word
-    let size = 50; const wrap = s => { ctx.font = font(700, s); const out = []; let line = "";
-      for (const w of S.body.split(" ")) { const L = line ? line + " " + w : w; if (ctx.measureText(L).width > 880 && line) { out.push(line); line = w; } else line = L; } if (line) out.push(line); return out; };
-    let lines = wrap(size); while (lines.length > 3 && size > 30) { size -= 2; lines = wrap(size); }
-    let wi = 0; const y0 = 1290;
+    let size = 58; const wrap = s => { ctx.font = font(700, s); const out = []; let line = "";
+      for (const w of S.body.split(" ")) { const L = line ? line + " " + w : w; if (ctx.measureText(L).width > 940 && line) { out.push(line); line = w; } else line = L; } if (line) out.push(line); return out; };
+    let lines = wrap(size); while (lines.length > 3 && size > 32) { size -= 2; lines = wrap(size); }
+    let wi = 0; const y0 = 1255;
     lines.forEach((ln, li) => { ctx.font = font(700, size); const parts = ln.split(" "), sp = ctx.measureText(" ").width;
       const ws = parts.map(p => ctx.measureText(p).width), tot = ws.reduce((a, b) => a + b, 0) + sp * (parts.length - 1); let x = 540 - tot / 2;
-      parts.forEach((p, j) => { const k = prog(t, 1.4 + (wi + j) * 0.07, 0.45); if (k) { ctx.save(); blur((1 - eo(k)) * 8); txt(p, x, y0 + li * size * 1.3 + 22 * (1 - eo(k)), size, 700, S.text, k, 0, "left"); ctx.restore(); blur(0); } x += ws[j] + sp; });
+      parts.forEach((p, j) => { const k = prog(t, 1.3 + (wi + j) * 0.07, 0.45); if (k) { ctx.save(); blur((1 - eo(k)) * 8); txt(p, x, y0 + li * size * 1.28 + 22 * (1 - eo(k)), size, 700, S.text, k, 0, "left"); ctx.restore(); blur(0); } x += ws[j] + sp; });
       wi += parts.length; });
-    // typed highlight
-    const hi = S.bodyHi.toUpperCase(), hs = fitSize(hi, 900, 76, 960, -1), hy = y0 + lines.length * size * 1.3 + 40;
-    const start = 1.4 + wi * 0.07 + 0.35, n = Math.floor(Math.max(0, t - start) / 0.06), shown = hi.slice(0, n);
-    if (t > start - 0.2) { const full = measure(hi, hs, 900, -1), x0 = 540 - full / 2;
-      ctx.save(); ctx.shadowColor = rgba(S.accent, 0.35); ctx.shadowBlur = 30; txt(shown, x0, hy, hs, 900, S.accent, 1, -1, "left"); ctx.restore();
-      caret(x0 + measure(shown, hs, 900, -1) + 8, hy + 4, hs * 0.95, t, n > 0 && n < hi.length); }
-  }, false, false);
+    const hi = S.bodyHi.toUpperCase(), hs = fitSize(hi, 900, 96, 1000, -2), hy = y0 + lines.length * size * 1.28 + 36;
+    const start = 1.3 + wi * 0.07 + 0.3, n = Math.floor(Math.max(0, t - start) / 0.055), shown = hi.slice(0, n);
+    if (t > start - 0.2) { const full = measure(hi, hs, 900, -2), x0 = 540 - full / 2;
+      ctx.save(); ctx.shadowColor = rgba(S.accent, 0.35); ctx.shadowBlur = 30; txt(shown, x0, hy, hs, 900, S.accent, 1, -2, "left"); ctx.restore();
+      caret(x0 + measure(shown, hs, 900, -2) + 8, hy + 6, hs * 0.92, t, n > 0 && n < hi.length); }
+  }, i, o);
 }
 
 // ---------- scene 4: call to action ----------
-function cta(t, D) {
+function cta(t, D, i, o) {
   scene(t, D, () => {
-    track(S.t1.toUpperCase(), 600, 104, S.text, t, 0.05, 0.75);
-    track(S.t2.toUpperCase(), 720, 104, S.text, t, 0.3, 0.75);
-    const k = prog(t, 0.6, 0.7); if (k) { const e = eo(k), w3 = S.t3.toUpperCase(), s3 = fitSize(w3, 900, 132, 1000, -2);
-      ctx.save(); ctx.translate(540, 840 + s3 / 2); ctx.scale(lerp(1.7, 1, e), lerp(1.7, 1, e)); ctx.translate(-540, -(840 + s3 / 2));
-      blur((1 - e) * 14); ctx.shadowColor = rgba(S.accent, 0.35); ctx.shadowBlur = 40; txt(w3, 540, 840, s3, 900, S.accent, Math.min(1, k * 2), -2); ctx.restore(); blur(0); }
-    // URL bar
-    const b = prog(t, 1.1, 0.55); if (!b) return; const be = eo(b);
-    const bx = 90, bw = 900, bh = 150, by = 1130 + 60 * (1 - be);
-    const click = 2.85, pk = t - click;
+    const l1 = S.t1.toUpperCase(), s1 = fitSize(l1, 900, 132, 1010, -3);
+    track(l1, 560, 132, S.text, t, 0.0, 0.75);
+    track(S.t2.toUpperCase(), 560 + s1 * 1.08, 132, S.text, t, 0.2, 0.75);
+    const y3 = 560 + s1 * 2.16, k = prog(t, 0.45, 0.7);
+    if (k) { const e = eo(k), w3 = S.t3.toUpperCase(), s3 = fitSize(w3, 900, 176, 1010, -3);
+      ctx.save(); ctx.translate(540, y3 + s3 / 2); ctx.scale(lerp(1.6, 1, e), lerp(1.6, 1, e)); ctx.translate(-540, -(y3 + s3 / 2));
+      blur((1 - e) * 14); ctx.shadowColor = rgba(S.accent, 0.35); ctx.shadowBlur = 40; txt(w3, 540, y3, s3, 900, S.accent, Math.min(1, k * 2), -3); ctx.restore(); blur(0); }
+    const b = prog(t, 1.0, 0.55); if (!b) return; const be = eo(b);
+    const bx = 70, bw = 940, bh = 180, by = 1170 + 60 * (1 - be);
+    const click = 2.75, pk = t - click;
     let bs = 1; if (pk > 0 && pk < 0.1) bs = lerp(1, 0.86, pk / 0.1); else if (pk >= 0.1 && pk < 0.45) bs = lerp(0.86, 1, back((pk - 0.1) / 0.35));
-    ctx.save(); blur((1 - be) * 10); glass(bx, by, bw, bh, 75, 0.3, b); blur(0); alpha(b);
-    icon("globe", bx + 46, by + 45, 60, S.accent, 2.2);
-    const url = S.url, us = fitSize(url, 700, 54, bw - 330), n = Math.floor(Math.max(0, t - 1.45) / 0.05), shown = url.slice(0, n);
-    txt(shown, bx + 132, by + bh / 2 + 3, us, 700, S.text, b, 0, "left", "middle");
-    caret(bx + 134 + measure(shown, us, 700) + 6, by + 46, bh - 92, t, n > 0 && n < url.length);
-    const ox = bx + bw - 80, oy = by + bh / 2;
+    ctx.save(); blur((1 - be) * 10); glass(bx, by, bw, bh, 90, 0.3, b); blur(0); alpha(b);
+    icon("globe", bx + 52, by + 54, 72, S.accent, 2.2);
+    const url = S.url, us = fitSize(url, 700, 62, bw - 360), n = Math.floor(Math.max(0, t - 1.35) / 0.045), shown = url.slice(0, n);
+    txt(shown, bx + 150, by + bh / 2 + 3, us, 700, S.text, b, 0, "left", "middle");
+    caret(bx + 152 + measure(shown, us, 700) + 6, by + 52, bh - 104, t, n > 0 && n < url.length);
+    const ox = bx + bw - 96, oy = by + bh / 2;
     ctx.save(); ctx.translate(ox, oy); ctx.scale(bs, bs); ctx.shadowColor = rgba(S.accent, 0.45); ctx.shadowBlur = 30;
-    ctx.beginPath(); ctx.arc(0, 0, 54, 0, 7); ctx.fillStyle = S.accent; ctx.fill(); ctx.shadowColor = "transparent";
-    icon("arrow", -26, -26, 52, "#FFFFFF", 2.8); ctx.restore();
-    if (pk > 0) { const rp = cl(pk / 0.7); alpha((1 - rp) * 0.6); ctx.lineWidth = 4; ctx.strokeStyle = S.accent; ctx.beginPath(); ctx.arc(ox, oy, 54 + rp * 160, 0, 7); ctx.stroke(); }
+    ctx.beginPath(); ctx.arc(0, 0, 66, 0, 7); ctx.fillStyle = S.accent; ctx.fill(); ctx.shadowColor = "transparent";
+    icon("arrow", -32, -32, 64, "#FFFFFF", 2.8); ctx.restore();
+    if (pk > 0) { const rp = cl(pk / 0.7); alpha((1 - rp) * 0.6); ctx.lineWidth = 4; ctx.strokeStyle = S.accent; ctx.beginPath(); ctx.arc(ox, oy, 66 + rp * 180, 0, 7); ctx.stroke(); }
     ctx.restore();
-    // pointer glides in and clicks
-    const ck = prog(t, 2.1, 0.7); if (ck > 0) { const e = eo(ck), x = lerp(ox + 260, ox + 8, e), y = lerp(oy + 420, oy + 10, e);
-      ctx.save(); alpha(cl(ck * 3)); ctx.translate(x, y); const ps = pk > 0 && pk < 0.2 ? 2.6 : 3; ctx.scale(ps, ps);
+    const ck = prog(t, 2.0, 0.7); if (ck > 0) { const e = eo(ck), x = lerp(ox + 260, ox + 10, e), y = lerp(oy + 400, oy + 12, e);
+      ctx.save(); alpha(cl(ck * 3)); ctx.translate(x, y); const ps = pk > 0 && pk < 0.2 ? 3.0 : 3.4; ctx.scale(ps, ps);
       ctx.fillStyle = S.bg; ctx.fill(P2D.pointer); ctx.strokeStyle = S.text; ctx.lineWidth = 1.8; ctx.lineJoin = "round"; ctx.stroke(P2D.pointer); ctx.restore(); }
-  }, false, true);
+    const ma = eo(prog(t, 1.5, 0.8)) * 0.75;
+    if (ma) { marquee(t, 1500, -1, ma);
+      const fade = (x0, x1) => { const g = ctx.createLinearGradient(x0, 0, x1, 0); g.addColorStop(0, rgba(S.bg, 1)); g.addColorStop(1, rgba(S.bg, 0)); ctx.globalAlpha = gA; ctx.fillStyle = g; };
+      fade(0, 180); ctx.fillRect(0, 1480, 180, 160); fade(W, W - 180); ctx.fillRect(W - 180, 1480, 180, 160); }
+  }, i, o);
 }
 
 const total = () => S.tHook + S.tCats + S.tHub + S.tCta;
+const OV = 0.6; // scenes overlap and cross-dissolve for this long
 function render(T) {
   ctx.save(); background(T);
-  const a = S.tHook, b = a + S.tCats, c = b + S.tHub;
-  if (T < a) hook(T, S.tHook); else if (T < b) categories(T - a, S.tCats); else if (T < c) hub(T - b, S.tHub); else cta(T - c, S.tCta);
+  const list = [[hook, S.tHook], [categories, S.tCats], [hub, S.tHub], [cta, S.tCta]], tot = total();
+  let st = 0;
+  list.forEach(([fn, D], k) => {
+    const s0 = st; st += D;
+    const from = k === 0 ? -1 : s0 - OV / 2, to = k === list.length - 1 ? tot + 1 : s0 + D + OV / 2;
+    if (T < from || T > to) return;
+    const i = k === 0 ? 1 : eio(cl((T - (s0 - OV / 2)) / OV)), o = k === list.length - 1 ? 0 : eio(cl((T - (s0 + D - OV / 2)) / OV));
+    fn(T - s0, D, i, o);
+  });
   ctx.restore(); ctx.filter = "none"; ctx.globalAlpha = 1;
 }
 
@@ -435,7 +468,7 @@ function marks() {
 }
 
 // ---------- form binding ----------
-const textIds = ["h1", "h2", "h3", "body", "bodyHi", "t1", "t2", "t3", "url"];
+const textIds = ["pill", "h1", "h2", "h3", "body", "bodyHi", "t1", "t2", "t3", "url"];
 const timeIds = ["tHook", "tCats", "tHub", "tCta"];
 const status = $("status"); let dirty = false;
 function touch() { dirty = true; status.textContent = "Unsaved changes"; marks(); }
