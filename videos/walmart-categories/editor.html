@@ -1,0 +1,482 @@
+<title>Walmart Categories Studio</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@700;800;900&family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: studio split — sticky 9:16 preview + transport on the left, scene-by-scene edit panel on the right; stacks on phones */
+:root {
+  --bg: #F3F4F6; --panel: #FFFFFF; --line: #E3E5EA; --fg: #17181C; --muted: #6A6F7A;
+  --accent: #FF6A00; --accent-soft: #FFF1E7; --accent-ink: #FFFFFF; --stage: #E8EAEE;
+  --ui: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121316; --panel: #1B1D21; --line: #2C2F35; --fg: #EDEEF0; --muted: #9AA0AA;
+  --accent: #FF7A1A; --accent-soft: #3A2414; --accent-ink: #FFFFFF; --stage: #0C0D0F; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #121316; --panel: #1B1D21; --line: #2C2F35; --fg: #EDEEF0; --muted: #9AA0AA;
+  --accent: #FF7A1A; --accent-soft: #3A2414; --accent-ink: #FFFFFF; --stage: #0C0D0F; color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--ui); font-size: 14px; line-height: 1.45; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-block: 20px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+header.top h1 { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.01em; text-wrap: balance; }
+header.top p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+.status { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+.grid { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 860px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+
+.stagecol { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); display: flex; flex-direction: column; gap: 12px; }
+@media (max-width: 860px) { .stagecol { position: static; } }
+.stage { background: var(--stage); border-radius: 18px; padding: 16px; display: flex; justify-content: center; }
+canvas#view { width: 100%; max-width: 360px; aspect-ratio: 9 / 16; height: auto; border-radius: 14px; display: block;
+  box-shadow: 0 10px 30px rgba(0,0,0,.12); background: #fff; }
+
+.transport { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.trow { display: flex; align-items: center; gap: 10px; }
+.tc { font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 92px; text-align: right; }
+.scrub { position: relative; flex: 1; min-width: 0; }
+.scrub input[type=range] { width: 100%; accent-color: var(--accent); }
+.marks { display: flex; font-size: 11px; color: var(--muted); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.marks span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; border-left: 2px solid var(--line); padding-left: 6px; cursor: pointer; }
+.marks span:hover { color: var(--accent); }
+
+button { font: inherit; cursor: pointer; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--fg);
+  padding: 9px 14px; font-weight: 700; }
+button:hover { border-color: var(--accent); }
+button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+button.icon { width: 40px; height: 40px; padding: 0; display: grid; place-items: center; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.actions button { flex: 1 1 auto; }
+.note { font-size: 12px; color: var(--muted); margin: 0; }
+
+.panel { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+section.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; min-width: 0; }
+section.card h2 { margin: 0 0 12px; font-size: 13px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+section.card h2 small { font-family: var(--mono); font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--muted); font-size: 11px; }
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
+@media (max-width: 520px) { .fields { grid-template-columns: minmax(0, 1fr); } }
+.fields .full { grid-column: 1 / -1; }
+label.f { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+label.f span { font-size: 12px; font-weight: 700; color: var(--muted); }
+input[type=text], textarea { width: 100%; font: inherit; font-weight: 600; color: var(--fg); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 9px; padding: 9px 10px; min-width: 0; }
+textarea { resize: vertical; min-height: 62px; }
+.colors { display: flex; flex-wrap: wrap; gap: 12px; }
+.sw { display: flex; align-items: center; gap: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px 6px 6px; }
+.sw input[type=color] { width: 34px; height: 30px; border: 0; padding: 0; background: none; cursor: pointer; }
+.sw span { font-size: 12px; font-weight: 700; }
+.sw code { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.range { display: grid; grid-template-columns: 110px minmax(0,1fr) 52px; align-items: center; gap: 10px; }
+.range + .range { margin-top: 8px; }
+.range span { font-size: 12px; font-weight: 700; color: var(--muted); }
+.range output { font-family: var(--mono); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+.range input { accent-color: var(--accent); width: 100%; }
+.logo-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.logo-prev { width: 56px; height: 56px; border-radius: 50%; border: 2px solid var(--accent); background: #fff; display: grid; place-items: center; overflow: hidden; }
+.logo-prev img { max-width: 70%; max-height: 70%; }
+.tip { font-size: 12px; color: var(--muted); margin: 10px 0 0; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Walmart Categories Studio</h1>
+      <p>15-second SaaS motion video · 1080 × 1920 · edit on the right, watch it update on the left</p>
+    </div>
+    <div class="status" id="status" aria-live="polite">Example settings loaded</div>
+  </header>
+
+  <div class="grid">
+    <div class="stagecol">
+      <div class="stage"><canvas id="view" width="1080" height="1920" aria-label="Animation preview"></canvas></div>
+      <div class="transport">
+        <div class="trow">
+          <button class="icon" id="play" aria-label="Pause">❚❚</button>
+          <div class="scrub"><input type="range" id="scrub" min="0" max="15" step="0.01" value="0" aria-label="Timeline"></div>
+          <div class="tc" id="tc">00.00 / 15.00</div>
+        </div>
+        <div class="marks" id="marks"></div>
+      </div>
+      <div class="actions">
+        <button class="primary" id="save">Save for final render</button>
+        <button id="export">Download preview (.webm)</button>
+      </div>
+      <p class="note" id="note">Save stores your edits so Claude can render the final HD MP4 with music. The preview download is silent.</p>
+    </div>
+
+    <div class="panel">
+      <section class="card">
+        <h2>Scene 1 · Hook <small id="d1"></small></h2>
+        <div class="fields">
+          <label class="f full"><span>Top tag</span><input type="text" id="pill"></label>
+          <label class="f"><span>Heading line 1</span><input type="text" id="h1"></label>
+          <label class="f"><span>Heading line 2</span><input type="text" id="h2"></label>
+          <label class="f full"><span>Orange highlight</span><input type="text" id="h3"></label>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Scene 2 · Categories <small id="d2"></small></h2>
+        <div class="fields">
+          <label class="f"><span>Card 1</span><input type="text" id="c0"></label>
+          <label class="f"><span>Card 2</span><input type="text" id="c1"></label>
+          <label class="f"><span>Card 3</span><input type="text" id="c2"></label>
+          <label class="f"><span>Card 4</span><input type="text" id="c3"></label>
+          <label class="f full"><span>Card 5 (wide card)</span><input type="text" id="c4"></label>
+          <label class="f full"><span>Body text</span><textarea id="body"></textarea></label>
+          <label class="f full"><span>Orange highlight</span><input type="text" id="bodyHi"></label>
+        </div>
+        <div class="logo-row" style="margin-top:12px">
+          <div class="logo-prev" id="logoPrev" aria-hidden="true"></div>
+          <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+            <label class="f"><span>Centre logo (PNG or SVG, optional)</span><input type="file" id="logo" accept="image/png,image/svg+xml,image/jpeg,image/webp"></label>
+            <button id="logoClear" type="button">Use cart icon</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Scene 3 · Call to action <small id="d3"></small></h2>
+        <div class="fields">
+          <label class="f"><span>Heading line 1</span><input type="text" id="t1"></label>
+          <label class="f"><span>Heading line 2</span><input type="text" id="t2"></label>
+          <label class="f"><span>Orange highlight</span><input type="text" id="t3"></label>
+          <label class="f"><span>Button text</span><input type="text" id="url"></label>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Brand colours</h2>
+        <div class="colors">
+          <label class="sw"><input type="color" id="colAccent"><span>Accent / icons</span><code id="colAccentV"></code></label>
+          <label class="sw"><input type="color" id="colText"><span>Text</span><code id="colTextV"></code></label>
+          <label class="sw"><input type="color" id="colBg"><span>Background</span><code id="colBgV"></code></label>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Timing <small id="total"></small></h2>
+        <div class="range"><span>Hook</span><input type="range" id="tHook" min="2" max="5" step="0.1"><output id="tHookV"></output></div>
+        <div class="range"><span>Categories</span><input type="range" id="tCats" min="6.5" max="11" step="0.1"><output id="tCatsV"></output></div>
+        <div class="range"><span>Call to action</span><input type="range" id="tCta" min="2.6" max="5" step="0.1"><output id="tCtaV"></output></div>
+        <div class="range"><span>Motion speed</span><input type="range" id="tSpeed" min="0.7" max="1.4" step="0.05"><output id="tSpeedV"></output></div>
+        <p class="tip">Headings are always set in capitals. Long text shrinks to fit the frame.</p>
+      </section>
+
+      <div class="actions"><button id="reset" type="button">Reset to original</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const ICONS = {
+  smartphone: "M 7 2 L 17 2 C 18.105 2 19 2.895 19 4 L 19 20 C 19 21.105 18.105 22 17 22 L 7 22 C 5.895 22 5 21.105 5 20 L 5 4 C 5 2.895 5.895 2 7 2 Z M 12 18 L 12.01 18",
+  sparkles: "M 11.017 2.814 C 11.105 2.341 11.519 1.998 12 1.998 C 12.481 1.998 12.895 2.341 12.983 2.814 L 14.034 8.372 C 14.187 9.181 14.819 9.813 15.628 9.966 L 21.186 11.017 C 21.659 11.105 22.002 11.519 22.002 12 C 22.002 12.481 21.659 12.895 21.186 12.983 L 15.628 14.034 C 14.819 14.187 14.187 14.819 14.034 15.628 L 12.983 21.186 C 12.895 21.659 12.481 22.002 12 22.002 C 11.519 22.002 11.105 21.659 11.017 21.186 L 9.966 15.628 C 9.813 14.819 9.181 14.187 8.372 14.034 L 2.814 12.983 C 2.341 12.895 1.998 12.481 1.998 12 C 1.998 11.519 2.341 11.105 2.814 11.017 L 8.372 9.966 C 9.181 9.813 9.813 9.181 9.966 8.372 Z M 20 2 L 20 6 M 22 4 L 18 4 M 6 20 C 6 21.105 5.105 22 4 22 C 2.895 22 2 21.105 2 20 C 2 18.895 2.895 18 4 18 C 5.105 18 6 18.895 6 20 Z",
+  house: "M 15 21 L 15 13 C 15 12.448 14.552 12 14 12 L 10 12 C 9.448 12 9 12.448 9 13 L 9 21 M 3 10 C 3 9.411 3.259 8.852 3.709 8.472 L 10.709 2.472 C 11.454 1.842 12.546 1.842 13.291 2.472 L 20.291 8.472 C 20.741 8.852 21 9.411 21 10 L 21 19 C 21 20.105 20.105 21 19 21 L 5 21 C 3.895 21 3 20.105 3 19 Z",
+  shirt: "M 20.38 3.46 L 16 2 C 16 4.209 14.209 6 12 6 C 9.791 6 8 4.209 8 2 L 3.62 3.46 C 2.685 3.772 2.116 4.718 2.28 5.69 L 2.86 9.16 C 2.939 9.645 3.358 10.001 3.85 10 L 6 10 L 6 20 C 6 21.1 6.9 22 8 22 L 16 22 C 17.105 22 18 21.105 18 20 L 18 10 L 20.15 10 C 20.642 10.001 21.061 9.645 21.14 9.16 L 21.72 5.69 C 21.884 4.718 21.315 3.772 20.38 3.46 Z",
+  heart: "M 2 9.5 C 2 7.222 3.404 5.18 5.532 4.364 C 7.659 3.549 10.068 4.13 11.591 5.824 C 11.697 5.937 11.845 6.001 12 6.001 C 12.155 6.001 12.303 5.937 12.409 5.824 C 13.927 4.118 16.343 3.53 18.475 4.347 C 20.607 5.165 22.011 7.217 22 9.5 C 22 11.79 20.5 13.5 19 15 L 13.508 20.313 C 13.131 20.746 12.586 20.996 12.012 21 C 11.438 21.003 10.89 20.76 10.508 20.332 L 5 15 C 3.5 13.5 2 11.8 2 9.5 M 3.22 13 L 9.5 13 L 10 12 L 12 16.5 L 14 9.5 L 15.5 13 L 20.77 13",
+  cart: "M 9 21 C 9 21.552 8.552 22 8 22 C 7.448 22 7 21.552 7 21 C 7 20.448 7.448 20 8 20 C 8.552 20 9 20.448 9 21 Z M 20 21 C 20 21.552 19.552 22 19 22 C 18.448 22 18 21.552 18 21 C 18 20.448 18.448 20 19 20 C 19.552 20 20 20.448 20 21 Z M 2.05 2.05 L 4.05 2.05 L 6.71 14.47 C 6.911 15.408 7.751 16.071 8.71 16.05 L 18.49 16.05 C 19.428 16.048 20.238 15.396 20.44 14.48 L 22.09 7.05 L 5.12 7.05",
+  store: "M 15 21 L 15 16 C 15 15.448 14.552 15 14 15 L 10 15 C 9.448 15 9 15.448 9 16 L 9 21 M 17.774 10.31 C 17.341 9.895 16.658 9.895 16.225 10.31 C 15.259 11.231 13.74 11.231 12.774 10.31 C 12.341 9.896 11.659 9.896 11.226 10.31 C 10.26 11.232 8.74 11.232 7.774 10.31 C 7.341 9.895 6.658 9.895 6.225 10.31 C 5.294 11.198 3.842 11.235 2.867 10.395 C 1.893 9.556 1.714 8.114 2.455 7.062 L 5.344 2.878 C 5.716 2.329 6.337 2 7 2 L 17 2 C 17.661 2 18.28 2.327 18.653 2.873 L 21.548 7.065 C 22.289 8.118 22.109 9.561 21.133 10.4 C 20.157 11.239 18.703 11.199 17.774 10.309 M 4 10.95 L 4 19 C 4 20.105 4.895 21 6 21 L 18 21 C 19.105 21 20 20.105 20 19 L 20 10.95",
+  arrow: "M 5 12 L 19 12 M 12 5 L 19 12 L 12 19",
+  pointer: "M 4.037 4.688 C 3.956 4.502 3.998 4.285 4.141 4.141 C 4.285 3.998 4.502 3.956 4.688 4.037 L 20.688 10.537 C 20.888 10.618 21.013 10.818 20.998 11.033 C 20.984 11.248 20.834 11.43 20.625 11.484 L 14.501 13.064 C 13.796 13.245 13.246 13.795 13.063 14.499 L 11.484 20.625 C 11.43 20.834 11.248 20.984 11.033 20.998 C 10.818 21.013 10.618 20.888 10.537 20.688 Z",
+};
+const P2D = Object.fromEntries(Object.entries(ICONS).map(([k, d]) => [k, new Path2D(d)]));
+const CAT_ICONS = ["smartphone", "sparkles", "house", "shirt", "heart"];
+
+const DEFAULTS = {
+  pill: "Walmart Marketplace", h1: "Walmart isn't", h2: "Just about", h3: "Groceries",
+  cats: ["Electronics", "Beauty", "Home", "Fashion", "Health & Wellness"],
+  body: "Thousands of businesses sell across categories through", bodyHi: "Walmart Marketplace",
+  t1: "See where", t2: "Your product", t3: "Could fit", url: "www.eskillvisor.com",
+  accent: "#FF6A00", text: "#111111", bg: "#FFFFFF",
+  tHook: 3.0, tCats: 8.6, tCta: 3.4, speed: 1, logoId: null,
+};
+let S = structuredClone(DEFAULTS);
+let logoImg = null;
+
+// ---------- colour + easing helpers ----------
+const hex = h => { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+const mix = (a, b, t) => { const A = hex(a), B = hex(b); return "rgb(" + A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(",") + ")"; };
+const rgba = (h, a) => { const [r, g, b] = hex(h); return `rgba(${r},${g},${b},${a})`; };
+const cl = x => Math.max(0, Math.min(1, x));
+const eo = t => 1 - Math.pow(1 - t, 4);
+const ei = t => t * t * t;
+const back = t => { const c = 1.25, u = t - 1; return 1 + (c + 1) * u * u * u + c * u * u; };
+const lerp = (a, b, t) => a + (b - a) * t;
+const prog = (t, at, dur) => cl((t - at) / dur);
+
+// ---------- canvas ----------
+const cv = document.getElementById("view"), ctx = cv.getContext("2d");
+const W = 1080, H = 1920;
+const font = (w, s) => `${w} ${s}px Inter, "Helvetica Neue", Arial, sans-serif`;
+
+function rr(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
+function icon(name, x, y, size, color, sw) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(size / 24, size / 24);
+  ctx.strokeStyle = color; ctx.lineWidth = sw; ctx.lineCap = "round"; ctx.lineJoin = "round";
+  ctx.stroke(P2D[name]); ctx.restore();
+}
+function fitSize(text, weight, size, maxW, ls = 0) {
+  ctx.font = font(weight, size); ctx.letterSpacing = ls + "px";
+  const w = ctx.measureText(text).width;
+  return w > maxW ? Math.floor(size * maxW / w) : size;
+}
+// word-by-word rise, centred on cx; returns drawn width
+function words(text, cx, y, size, weight, color, t, at, dur, stagger, rise, ls = 0, maxW = 1020) {
+  size = fitSize(text, weight, size, maxW, ls);
+  ctx.font = font(weight, size); ctx.letterSpacing = ls + "px"; ctx.textBaseline = "top"; ctx.fillStyle = color;
+  const parts = text.split(" "), space = ctx.measureText(" ").width;
+  const ws = parts.map(p => ctx.measureText(p).width);
+  const total = ws.reduce((a, b) => a + b, 0) + space * (parts.length - 1);
+  let x = cx - total / 2;
+  parts.forEach((p, i) => {
+    const k = prog(t, at + i * stagger, dur);
+    if (k > 0) { ctx.globalAlpha = k * gA; ctx.fillText(p, x, y + rise * (1 - eo(k))); }
+    x += ws[i] + space;
+  });
+  ctx.globalAlpha = gA; ctx.letterSpacing = "0px";
+  return { w: total, size };
+}
+function wrapLines(text, size, weight, maxW) {
+  ctx.font = font(weight, size); const out = []; let line = "";
+  for (const w of text.split(" ")) { const tryL = line ? line + " " + w : w;
+    if (ctx.measureText(tryL).width > maxW && line) { out.push(line); line = w; } else line = tryL; }
+  if (line) out.push(line); return out;
+}
+let gA = 1; // scene alpha multiplier
+
+function sceneWrap(t, D, draw) {
+  const ex = prog(t, D - 0.4, 0.4);
+  ctx.save(); gA = 1 - ex; ctx.globalAlpha = gA; ctx.translate(0, -80 * ei(ex));
+  draw(); ctx.restore(); gA = 1;
+}
+
+function background(T, total) {
+  ctx.fillStyle = S.bg; ctx.fillRect(0, 0, W, H);
+  const ph = Math.sin(Math.PI * T / total);
+  const blob = (cx, cy, r, a) => { const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    g.addColorStop(0, rgba(S.accent, a)); g.addColorStop(1, rgba(S.accent, 0)); ctx.fillStyle = g; ctx.fillRect(cx - r, cy - r, r * 2, r * 2); };
+  blob(1020 - 120 * ph, 120 + 160 * ph, 500, 0.14);
+  blob(0 + 140 * ph, 1750, 500, 0.10);
+}
+
+function hook(t, D) {
+  const tint = mix(S.accent, S.bg, 0.9);
+  sceneWrap(t, D, () => {
+    // tag pill
+    const k = eo(prog(t, 0, 0.5)); const pillT = S.pill.toUpperCase();
+    ctx.font = font(700, 27); ctx.letterSpacing = "3px"; const tw = ctx.measureText(pillT).width; ctx.letterSpacing = "0px";
+    const pw = tw + 84 + 40, px = W / 2 - pw / 2, py = 580 + 20 * (1 - k);
+    ctx.globalAlpha = k * gA; rr(px, py, pw, 76, 38); ctx.fillStyle = tint; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = S.accent; ctx.stroke();
+    icon("store", px + 34, py + 20, 36, S.accent, 2.4);
+    ctx.font = font(700, 27); ctx.letterSpacing = "3px"; ctx.fillStyle = S.accent; ctx.textBaseline = "middle";
+    ctx.fillText(pillT, px + 84, py + 39); ctx.letterSpacing = "0px"; ctx.globalAlpha = gA;
+    words(S.h1.toUpperCase(), W / 2, 730, 100, 900, S.text, t, 0.2, 0.5, 0.2, 50, -2);
+    words(S.h2.toUpperCase(), W / 2, 850, 100, 900, S.text, t, 0.5, 0.5, 0.2, 50, -2);
+    const hi = words(S.h3.toUpperCase(), W / 2, 970, 128, 900, S.accent, t, 0.85, 0.5, 0.2, 50, -2);
+    const uw = Math.min(620, hi.w * 0.85), r = eo(prog(t, 1.35, 0.6));
+    if (r > 0) { rr(W / 2 - uw / 2, 970 + hi.size * 1.24, uw * r, 14, 7); ctx.fillStyle = S.accent; ctx.fill(); }
+  });
+}
+
+function categories(t, D) {
+  const MOVE = Math.min(3.5, D - 4.6), T0 = MOVE + 0.2, cx = 540, cy = 900, ch = 150, Sc = 0.72;
+  const grid = [{ x: 90, y: 700, w: 440 }, { x: 550, y: 700, w: 440 }, { x: 90, y: 880, w: 440 }, { x: 550, y: 880, w: 440 }, { x: 90, y: 1060, w: 900 }];
+  const hub = [[300, 560], [780, 560], [215, 900], [865, 900], [540, 1235]];
+  const tint = mix(S.accent, S.bg, 0.9), edge = mix(S.text, S.bg, 0.93);
+  sceneWrap(t, D, () => {
+    // ring
+    const rk = prog(t, T0, 0.8);
+    if (rk > 0) { const s = lerp(0.7, 1, eo(rk)); ctx.globalAlpha = rk * gA;
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, 330 * s); g.addColorStop(0, rgba(S.accent, .10)); g.addColorStop(1, rgba(S.accent, 0));
+      ctx.beginPath(); ctx.arc(cx, cy, 330 * s, 0, Math.PI * 2); ctx.fillStyle = g; ctx.fill();
+      ctx.lineWidth = 3; ctx.strokeStyle = mix(S.accent, S.bg, 0.7); ctx.stroke(); ctx.globalAlpha = gA; }
+    // connectors
+    hub.forEach(([hx, hy], j) => { const k = prog(t, T0 + 0.5 + j * 0.08, 0.4); if (!k) return;
+      ctx.globalAlpha = 0.7 * k * gA; ctx.setLineDash([2, 12]); ctx.lineCap = "round"; ctx.lineWidth = 3; ctx.strokeStyle = S.accent;
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(hx, hy); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = gA; });
+    // centre
+    const ck = prog(t, T0 + 0.1, 0.7);
+    if (ck > 0) { const s = back(ck); ctx.save(); ctx.translate(cx, cy); ctx.scale(s, s);
+      ctx.shadowColor = rgba(S.accent, .25); ctx.shadowBlur = 50; ctx.shadowOffsetY = 20;
+      ctx.beginPath(); ctx.arc(0, 0, 140, 0, Math.PI * 2); ctx.fillStyle = S.bg; ctx.fill(); ctx.shadowColor = "transparent";
+      ctx.lineWidth = 6; ctx.strokeStyle = S.accent; ctx.stroke();
+      if (logoImg) { const m = 200, r = Math.min(m / logoImg.width, m / logoImg.height); ctx.drawImage(logoImg, -logoImg.width * r / 2, -logoImg.height * r / 2, logoImg.width * r, logoImg.height * r); }
+      else icon("cart", -65, -65, 130, S.accent, 2);
+      ctx.restore(); }
+    // cards
+    grid.forEach((g, j) => {
+      const ek = prog(t, 0.15 + j * 0.42, 0.55); if (!ek) return;
+      const mk = eo(prog(t, MOVE + j * 0.05, 0.9)), e = eo(ek);
+      const gx = g.x + g.w / 2, gy = g.y + ch / 2, [hx, hy] = hub[j];
+      const x = lerp(gx, hx, mk), y = lerp(gy, hy, mk) + 70 * (1 - e), s = lerp(1, Sc, mk) * lerp(0.96, 1, e);
+      ctx.save(); ctx.globalAlpha = ek * gA; ctx.translate(x, y); ctx.scale(s, s); ctx.translate(-g.w / 2, -ch / 2);
+      ctx.shadowColor = "rgba(17,17,17,.10)"; ctx.shadowBlur = 44; ctx.shadowOffsetY = 18;
+      rr(0, 0, g.w, ch, 34); ctx.fillStyle = S.bg; ctx.fill(); ctx.shadowColor = "transparent";
+      ctx.lineWidth = 2; ctx.strokeStyle = edge; ctx.stroke();
+      rr(28, 30, 90, 90, 24); ctx.fillStyle = tint; ctx.fill();
+      icon(CAT_ICONS[j], 46, 48, 54, S.accent, 2.2);
+      const label = S.cats[j] || ""; const fs = fitSize(label, 700, 44, g.w - 170);
+      ctx.font = font(700, fs); ctx.fillStyle = S.text; ctx.textBaseline = "middle"; ctx.fillText(label, 146, ch / 2 + 2);
+      ctx.restore();
+    });
+    // body copy
+    let size = 48; let lines = wrapLines(S.body, size, 700, 860);
+    while (lines.length > 3 && size > 30) { size -= 2; lines = wrapLines(S.body, size, 700, 860); }
+    let wi = 0;
+    lines.forEach((ln, li) => { const n = ln.split(" ").length;
+      words(ln, W / 2, 1380 + li * size * 1.3, size, 700, S.text, t, T0 + 1.0 + wi * 0.0875, 0.35, 0.0875, 24, 0, 860); wi += n; });
+    words(S.bodyHi.toUpperCase(), W / 2, 1380 + lines.length * size * 1.3 + 30, 68, 900, S.accent, t, T0 + 2.0, 0.5, 0.25, 36, -1);
+  });
+}
+
+function cta(t) {
+  words(S.t1.toUpperCase(), W / 2, 660, 100, 900, S.text, t, 0.1, 0.5, 0.2, 50, -2);
+  words(S.t2.toUpperCase(), W / 2, 780, 100, 900, S.text, t, 0.35, 0.5, 0.2, 50, -2);
+  words(S.t3.toUpperCase(), W / 2, 900, 128, 900, S.accent, t, 0.65, 0.5, 0.2, 50, -2);
+  const fs = fitSize(S.url, 700, 44, 760);
+  ctx.font = font(700, fs); const tw = ctx.measureText(S.url).width;
+  const bw = Math.max(600, tw + 210), bh = 130, bx = W / 2 - bw / 2, by = 1220;
+  const ek = prog(t, 1.2, 0.6);
+  let s = 1; const pk = t - 2.9; if (pk > 0 && pk < 0.12) s = lerp(1, 0.95, eo(pk / 0.12)); else if (pk >= 0.12 && pk < 0.42) s = lerp(0.95, 1, eo((pk - 0.12) / 0.3));
+  if (ek > 0) { ctx.save(); ctx.globalAlpha = ek; ctx.translate(W / 2, by + bh / 2 + 40 * (1 - eo(ek))); ctx.scale(s, s); ctx.translate(-W / 2, -(by + bh / 2));
+    ctx.shadowColor = rgba(S.accent, .33); ctx.shadowBlur = 40; ctx.shadowOffsetY = 18;
+    rr(bx, by, bw, bh, 65); ctx.fillStyle = S.accent; ctx.fill(); ctx.shadowColor = "transparent";
+    ctx.font = font(700, fs); ctx.fillStyle = "#FFFFFF"; ctx.textBaseline = "middle"; ctx.fillText(S.url, bx + 60, by + bh / 2 + 2);
+    icon("arrow", bx + bw - 100, by + 41, 48, "#FFFFFF", 2.6); ctx.restore(); }
+  // cursor glides to the button and clicks
+  const ck = prog(t, 1.5, 0.8), mk = eo(prog(t, 2.3, 0.6));
+  if (ck > 0) { const fx = bx + bw - 140, fy = by + 70;
+    const x = fx + 110 * (1 - mk) + 120 * (1 - eo(ck)), y = fy + 230 * (1 - mk) + 140 * (1 - eo(ck));
+    ctx.save(); ctx.globalAlpha = ck; ctx.translate(x, y); ctx.scale(3, 3); ctx.fillStyle = S.bg; ctx.fill(P2D.pointer);
+    ctx.strokeStyle = S.text; ctx.lineWidth = 2; ctx.lineJoin = "round"; ctx.stroke(P2D.pointer); ctx.restore(); }
+}
+
+function total() { return S.tHook + S.tCats + S.tCta; }
+function render(T) {
+  const tot = total(), sp = S.speed;
+  ctx.save(); background(T, tot);
+  if (T < S.tHook) hook(T * sp, S.tHook * sp);
+  else if (T < S.tHook + S.tCats) categories((T - S.tHook) * sp, S.tCats * sp);
+  else cta((T - S.tHook - S.tCats) * sp);
+  ctx.restore();
+}
+
+// ---------- transport ----------
+let T = 0, playing = !matchMedia("(prefers-reduced-motion: reduce)").matches, last = null;
+const playBtn = document.getElementById("play"), scrub = document.getElementById("scrub"), tc = document.getElementById("tc");
+function setPlay(p) { playing = p; playBtn.textContent = p ? "❚❚" : "▶"; playBtn.setAttribute("aria-label", p ? "Pause" : "Play"); last = null; }
+playBtn.onclick = () => setPlay(!playing);
+scrub.oninput = () => { T = +scrub.value; setPlay(false); };
+function frame(now) {
+  if (playing && !recording) { if (last != null) T += (now - last) / 1000; last = now; if (T >= total()) T = 0; }
+  if (recording) T = Math.min(total(), (now - recStart) / 1000);
+  render(T);
+  scrub.max = total().toFixed(2); scrub.value = T;
+  tc.textContent = `${T.toFixed(2).padStart(5, "0")} / ${total().toFixed(2)}`;
+  requestAnimationFrame(frame);
+}
+function marks() {
+  const m = document.getElementById("marks"), tot = total();
+  m.innerHTML = "";
+  [["Hook", 0, S.tHook], ["Categories", S.tHook, S.tCats], ["Call to action", S.tHook + S.tCats, S.tCta]].forEach(([n, at, d]) => {
+    const s = document.createElement("span"); s.textContent = n; s.style.width = (d / tot * 100) + "%"; s.title = `Jump to ${n}`;
+    s.onclick = () => { T = at + 0.01; setPlay(true); }; m.appendChild(s); });
+  document.getElementById("d1").textContent = `0.0–${S.tHook.toFixed(1)}s`;
+  document.getElementById("d2").textContent = `${S.tHook.toFixed(1)}–${(S.tHook + S.tCats).toFixed(1)}s`;
+  document.getElementById("d3").textContent = `${(S.tHook + S.tCats).toFixed(1)}–${tot.toFixed(1)}s`;
+  document.getElementById("total").textContent = `total ${tot.toFixed(1)}s`;
+}
+
+// ---------- form binding ----------
+const $ = id => document.getElementById(id);
+const textIds = ["pill", "h1", "h2", "h3", "body", "bodyHi", "t1", "t2", "t3", "url"];
+const status = $("status");
+let dirty = false;
+function touch() { dirty = true; status.textContent = "Unsaved changes"; marks(); }
+function fill() {
+  textIds.forEach(id => $(id).value = S[id]);
+  S.cats.forEach((c, i) => $("c" + i).value = c);
+  $("colAccent").value = S.accent; $("colText").value = S.text; $("colBg").value = S.bg;
+  ["Accent", "Text", "Bg"].forEach(k => $("col" + k + "V").textContent = $("col" + k).value.toUpperCase());
+  $("tHook").value = S.tHook; $("tCats").value = S.tCats; $("tCta").value = S.tCta; $("tSpeed").value = S.speed;
+  $("tHookV").value = S.tHook.toFixed(1) + "s"; $("tCatsV").value = S.tCats.toFixed(1) + "s"; $("tCtaV").value = S.tCta.toFixed(1) + "s"; $("tSpeedV").value = S.speed.toFixed(2) + "×";
+  const lp = $("logoPrev"); lp.innerHTML = ""; if (logoImg) { const im = new Image(); im.src = logoImg.src; im.alt = ""; lp.appendChild(im); }
+  marks();
+}
+textIds.forEach(id => $(id).addEventListener("input", e => { S[id] = e.target.value; touch(); }));
+[0, 1, 2, 3, 4].forEach(i => $("c" + i).addEventListener("input", e => { S.cats[i] = e.target.value; touch(); }));
+[["colAccent", "accent"], ["colText", "text"], ["colBg", "bg"]].forEach(([id, k]) => $(id).addEventListener("input", e => {
+  S[k] = e.target.value; $(id + "V").textContent = e.target.value.toUpperCase(); touch(); }));
+[["tHook", "tHook", "s"], ["tCats", "tCats", "s"], ["tCta", "tCta", "s"], ["tSpeed", "speed", "×"]].forEach(([id, k, u]) => $(id).addEventListener("input", e => {
+  S[k] = +e.target.value; $(id + "V").value = (+e.target.value).toFixed(u === "s" ? 1 : 2) + u; if (T > total()) T = 0; touch(); }));
+
+let logoFile = null;
+$("logo").addEventListener("change", e => { const f = e.target.files[0]; if (!f) return; logoFile = f;
+  const r = new FileReader(); r.onload = () => { const im = new Image(); im.onload = () => { logoImg = im; fill(); touch(); }; im.src = r.result; }; r.readAsDataURL(f); });
+$("logoClear").onclick = () => { logoImg = null; logoFile = null; S.logoId = null; $("logo").value = ""; fill(); touch(); };
+$("reset").onclick = () => { S = structuredClone(DEFAULTS); logoImg = null; logoFile = null; $("logo").value = ""; fill(); touch(); T = 0; setPlay(true); };
+
+// ---------- save (db) + logo (assets) ----------
+const DOC = "projects/walmart-categories";
+let dbRef = null, assetsNs = null;
+$("save").onclick = async () => {
+  if (!dbRef) { status.textContent = "Saving isn't available here. Open this page signed in to claude.ai."; return; }
+  $("save").disabled = true; status.textContent = "Saving…";
+  try {
+    if (logoFile && assetsNs) { const up = await assetsNs.upload(logoFile); S.logoId = up.id; logoFile = null; }
+    else if (logoFile && !assetsNs) { status.textContent = "Text and colours will save; the logo upload needs edit access."; }
+    await dbRef.doc(DOC).set({ ...S, cats: [...S.cats], savedAt: new Date().toISOString() });
+    dirty = false; status.textContent = "Saved. Tell Claude “render final” in chat.";
+  } catch (err) { status.textContent = "Couldn't save: " + (err && err.message ? err.message : "please try again"); }
+  $("save").disabled = false;
+};
+
+// ---------- preview export (webm) ----------
+let recording = false, recStart = 0, downloadsNs = null;
+$("export").onclick = async () => {
+  if (recording) return;
+  if (!cv.captureStream || typeof MediaRecorder === "undefined") { status.textContent = "This browser can't record the canvas. Try Chrome or Edge."; return; }
+  const stream = cv.captureStream(30);
+  const mime = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find(m => MediaRecorder.isTypeSupported(m));
+  let rec; try { rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 12e6 }); } catch { status.textContent = "Recording isn't supported in this view."; return; }
+  const chunks = []; rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+  rec.onstop = async () => { recording = false; $("export").disabled = false; setPlay(true);
+    const blob = new Blob(chunks, { type: "video/webm" });
+    if (!downloadsNs) { status.textContent = "Recorded, but downloads aren't available in this view."; return; }
+    try { await downloadsNs.save({ filename: "walmart-categories-preview.webm", data: blob }); status.textContent = "Preview downloaded."; }
+    catch (e) { status.textContent = e && e.code === "declined" ? "Download cancelled." : "Couldn't download the preview."; } };
+  recording = true; $("export").disabled = true; status.textContent = `Recording ${total().toFixed(1)}s preview…`;
+  T = 0; recStart = performance.now(); rec.start(250);
+  setTimeout(() => rec.stop(), total() * 1000 + 150);
+};
+
+// ---------- boot ----------
+fill();
+const boot = () => requestAnimationFrame(frame);
+(document.fonts ? Promise.all([document.fonts.load(font(900, 100)), document.fonts.load(font(700, 44))]).catch(() => {}) : Promise.resolve()).then(boot);
+
+(async () => {
+  if (!window.claude?.use) { $("save").disabled = true; $("note").textContent = "Saving needs claude.ai. You can still edit and preview here."; return; }
+  const [db, assets, downloads] = await Promise.all([claude.use("db"), claude.use("assets"), claude.use("downloads")]);
+  dbRef = db; assetsNs = assets; downloadsNs = downloads;
+  if (!downloads) $("export").hidden = true;
+  if (!db) { $("save").disabled = true; $("note").textContent = "Sign in to claude.ai to save edits for the final render."; return; }
+  try {
+    const snap = await db.doc(DOC).get();
+    if (snap.exists && !dirty) {
+      const d = snap.data(); S = { ...structuredClone(DEFAULTS), ...d, cats: Array.isArray(d.cats) ? [...d.cats] : [...DEFAULTS.cats] };
+      if (S.logoId) { const im = new Image(); im.onload = () => { logoImg = im; fill(); }; im.src = "/_blob/" + S.logoId; }
+      fill(); status.textContent = "Loaded your last saved version";
+    }
+  } catch { /* first open: keep defaults */ }
+})();
+</script>
