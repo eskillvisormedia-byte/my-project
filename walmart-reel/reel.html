@@ -34,6 +34,18 @@
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <g id="spark">
+      <rect x="-3.4" y="-15" width="6.8" height="10.5" rx="3.4"/>
+      <rect x="-3.4" y="-15" width="6.8" height="10.5" rx="3.4" transform="rotate(60)"/>
+      <rect x="-3.4" y="-15" width="6.8" height="10.5" rx="3.4" transform="rotate(120)"/>
+      <rect x="-3.4" y="-15" width="6.8" height="10.5" rx="3.4" transform="rotate(180)"/>
+      <rect x="-3.4" y="-15" width="6.8" height="10.5" rx="3.4" transform="rotate(240)"/>
+      <rect x="-3.4" y="-15" width="6.8" height="10.5" rx="3.4" transform="rotate(300)"/>
+    </g>
+  </defs>
+</svg>
 <div id="stage">
   <div class="grid" id="grid"></div>
 
@@ -59,6 +71,9 @@
       <path d="M44 56 H210 L194 120 H56 Z" fill="url(#cb)"/>
       <path d="M44 56 H210 L194 120 H56 Z" fill="none" stroke="#041E42" stroke-width="5" stroke-linejoin="round"/>
       <path d="M90 60 V116 M128 60 V116 M166 60 V116 M50 88 H202" stroke="#fff" stroke-width="3" opacity=".55"/>
+      <rect x="70" y="70" width="114" height="36" rx="8" fill="#fff"/>
+      <text x="77" y="95" font-family="Inter" font-weight="800" font-size="19" letter-spacing="-.7" fill="#0071CE">Walmart</text>
+      <use href="#spark" fill="#FFC220" transform="translate(170 88) scale(.6)"/>
       <circle cx="78" cy="166" r="16" fill="#041E42"/><circle cx="78" cy="166" r="6" fill="#fff"/>
       <circle cx="172" cy="166" r="16" fill="#041E42"/><circle cx="172" cy="166" r="6" fill="#fff"/>
     </svg>
@@ -85,7 +100,8 @@
       <path d="M239 170 L266 182 L270 232 L242 224 Z" fill="#0058A3"/>
       <path d="M40 110 H230" stroke="#C9DAEE" stroke-width="3"/>
       <path d="M90 130 C 90 96, 180 96, 180 130" fill="none" stroke="#9FB7D3" stroke-width="7" stroke-linecap="round"/>
-      <circle cx="135" cy="197" r="15" fill="#FFC220"/>
+      <text x="45" y="209" font-family="Inter" font-weight="800" font-size="35" letter-spacing="-1.2" fill="#fff">Walmart</text>
+      <use href="#spark" fill="#FFC220" transform="translate(205 197) scale(1.05)"/>
     </svg>
 
     <div class="abs" style="left:110px;top:760px">
@@ -188,7 +204,7 @@ let html='';
 CATS.forEach((c,i)=>{
   const y=420+i*230;
   html+=`<div class="chip" id="chip${i}" style="left:110px;top:${y}px"><svg viewBox="0 0 48 48">${c[1]}</svg></div>`;
-  html+=`<div class="cat" style="left:300px;top:${y+22}px;${i==4?'font-size:80px;top:'+(y+32)+'px':''}"><span class="w" data-in="${0.5+i*0.55}">${c[0]}<span style="color:var(--blue)">.</span></span></div>`;
+  html+=`<div class="cat" style="left:300px;top:${y+22}px;${i==4?'font-size:80px;top:'+(y+32)+'px':''}"><span class="w" data-in="${0.5+i*0.55}">${c[0]}</span></div>`;
 });
 $('cats').innerHTML=html;
 
