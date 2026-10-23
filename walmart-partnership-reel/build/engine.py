@@ -33,8 +33,9 @@ def ease(p):
 
 def soft(p):
     # mostly linear, eased at the ends: smooth but never stalls
+    # eased in and out so the pen never jerks when it starts or stops
     p = min(max(p, 0.0), 1.0)
-    return 0.55 * p + 0.45 * ease(p)
+    return ease(p)
 
 
 def glide(a, b, p):
@@ -104,8 +105,8 @@ class Text:
     def pen(self, p):
         q = soft(p)
         x = self.x0 + self.w * q
-        n = max(1, len(self.s))
-        y = self.y - self.size * (0.32 + 0.08 * math.sin(2 * math.pi * q * n * 0.5))
+        # a straight, steady line along the text (no per-letter wobble)
+        y = self.y - self.size * 0.32
         return (x, y)
 
     def draw(self, c, p, alpha=1.0):
@@ -198,23 +199,9 @@ class Scene:
     def __init__(self, t0, t1, items, gap=0.15, fade=True, final=False):
         self.t0, self.t1, self.fade, self.final = t0, t1, fade, final
         self.came_from = REST
-        self.items = []
-        t = 0.0
-        prev_end = None
-        for it in items:
-            if isinstance(it, Pause):
-                t += it.dur
-                continue
-            if prev_end is not None:
-                t += max(gap, dist(prev_end, it.start) / TRAVEL_SPEED)
-            self.items.append([it, t, it.dur])
-            t += it.dur
-            prev_end = it.end
-        fixed = ENTER + (FADE if fade else 0) + (EXIT if final else 0) + HOLD
-        k = min((t1 - t0 - fixed) / t, MAX_SLOW)
-        for row in self.items:
-            row[1] = t0 + ENTER + row[1] * k
-            row[2] *= k
+        self.gap = gap
+        self.src = items
+        self.items, end, k = self._schedule(t1 - (FADE if fade else 0) - (EXIT if final else 0) - HOLD)
         self.k = k
         # centre the scene's content vertically (a little above middle, clear of the reel UI)
         top, bot = 1e9, -1e9
@@ -225,9 +212,48 @@ class Scene:
                 r = el.path.computeTightBounds(); a, b = r.top(), r.bottom()
             top, bot = min(top, a), max(bot, b)
         self.dy = max(220 - top, 900 - (top + bot) / 2)
-        self.draw_end = t0 + ENTER + t * k
+        self.draw_end = end
         last = self.items[-1][0].end
         self.park = REST if final else (last[0] + 330, last[1] + self.dy + 520)
+
+    def _schedule(self, scene_end):
+        """Lay items out in time. An item with an `at` time (seconds in the video, matched to the
+        voiceover) starts exactly then; the items between two such cues are drawn at a pace that fills
+        the gap (never slower than MAX_SLOW x natural, and as fast as needed to keep in sync)."""
+        groups, cur = [], []
+        for it in self.src:
+            if getattr(it, 'at', None) is not None and cur:
+                groups.append(cur)
+                cur = []
+            cur.append(it)
+        groups.append(cur)
+        rows, prev_end, t = [], None, self.t0 + ENTER
+        ks = []
+        for gi, g in enumerate(groups):
+            start = max(t, getattr(g[0], 'at', None) or t)
+            nxt = groups[gi + 1][0].at if gi + 1 < len(groups) else scene_end
+            # natural layout of the group
+            lay, tt, pe = [], 0.0, prev_end
+            for it in g:
+                if isinstance(it, Pause):
+                    tt += it.dur
+                    continue
+                if pe is not None and lay:
+                    tt += max(self.gap, dist(pe, it.start) / TRAVEL_SPEED)
+                lay.append([it, tt, it.dur])
+                tt += it.dur
+                pe = it.end
+            # leave the pen enough time to glide calmly to the next cued item
+            reserve = 0.0
+            if gi + 1 < len(groups):
+                reserve = max(0.3, dist(pe, groups[gi + 1][0].start) / (TRAVEL_SPEED * 0.6))
+            k = min(MAX_SLOW, max(0.3, (nxt - start - reserve) / max(tt, 1e-3)))
+            ks.append(k)
+            for it, s0, d in lay:
+                rows.append([it, start + s0 * k, d * k])
+            t = start + tt * k
+            prev_end = pe
+        return rows, t, min(ks)
 
     def pen_at(self, t):
         dy = self.dy
