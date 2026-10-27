@@ -180,7 +180,9 @@ class Stroke:
             if kind != 'draw':
                 continue
             frac = 1.0 if j < i else soft(q)
-            d.getSegment(0, d.length() * frac, out, True)
+            seg = skia.Path()   # getSegment overwrites its target, so collect each piece separately
+            d.getSegment(0, d.length() * frac, seg, True)
+            out.addPath(seg)
         c.drawPath(out, pt)
 
 
