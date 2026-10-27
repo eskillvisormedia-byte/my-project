@@ -1,6 +1,7 @@
 # Scene list for the ESkillVisor Walmart partnership reel (1:35). Times follow the script at a natural pace.
 from engine import Text, Stroke, Pause, Scene, chain, INK, BLUE, YELLOW, GREY, W
 import icons as I
+import logo as L
 
 CX = W / 2
 
@@ -68,20 +69,16 @@ def build():
     S.append(Scene(10.4, 20.9, [a, b, sp, f1, t1, plus, f2, t2, ar, t3, hl(t3, 8)]))
 
     # 4-5. "That's what ESkillVisor does": three partnership models on Walmart Marketplace, for your budget and goals.
-    e = Text('ESKILLVISOR', CX, 300, 140, BLUE)
-    n3 = Text('3', 175, 665, 170, BLUE)
-    b = Text('PARTNERSHIP MODELS', CX + 60, 640, 90, maxw=780)
-    c = Text('ON WALMART MARKETPLACE', CX, 470, 66, GREY)
-    at(c, 24.5); at(n3, 28.6)
-    cards = []
-    for i, x in enumerate((230, 540, 850)):
-        cards.append(Stroke(I.card(x, 900, 105, 115), INK, 6, speed=1200))
-        cards.append(Text(str(i + 1), x, 945, 130, BLUE))
-    w = Stroke(I.wallet(330, 1010, 105), INK, 7, speed=900)
-    tw = Text('BUDGET', 330, 1230, 80)
-    tg = Stroke(I.target(750, 1010, 105), INK, 7, speed=1000)
-    tt = Text('GOALS', 750, 1230, 80)
-    S.append(Scene(20.9, 35.4, [at(e, 20.9), hl(e, 14), c, n3, b, at(w, 31.4), tw, tg, tt]))
+    lg = L.mark(CX, 190, 2.2) + L.wordmark(CX, 500, 104)
+    n3 = Text('3', 175, 840, 170, BLUE)
+    b = Text('PARTNERSHIP MODELS', CX + 60, 815, 90, maxw=780)
+    c = Text('ON WALMART MARKETPLACE', CX, 650, 66, GREY)
+    at(c, 25.6); at(n3, 28.6)
+    w = Stroke(I.wallet(330, 1140, 105), INK, 7, speed=900)
+    tw = Text('BUDGET', 330, 1360, 80)
+    tg = Stroke(I.target(750, 1140, 105), INK, 7, speed=1000)
+    tt = Text('GOALS', 750, 1360, 80)
+    S.append(Scene(20.9, 35.4, [at(lg[0], 20.9)] + lg[1:] + [c, n3, b, at(w, 31.4), tw, tg, tt]))
 
     # 6-8. The three options
     S.append(option_scene(35.4, 50.3, 1, 'INVENTORY', 'PARTNERSHIP', '$5,000',
@@ -105,9 +102,9 @@ def build():
     # 10. Discuss your requirements; contact ESkillVisor today; www.eskillvisor.com
     a = Text('DISCUSS YOUR', CX, 400, 96)
     b = Text('REQUIREMENTS', CX, 510, 96)
-    c = Text('CONTACT ESKILLVISOR TODAY', CX, 760, 80)
-    br = Stroke(I.browser(CX, 1080, 440, 120), INK, 6, speed=1700)
-    url = Text('www.eskillvisor.com', CX, 1155, 104, BLUE, caps=False, maxw=820)
-    cu = Stroke(I.cursor(CX + 330, 1165, 80), INK, 6)
-    S.append(Scene(82.1, 95.0, [a, b, at(c, 84.8), at(url, 86.9), hl(url, 10), br, cu], gap=0.12, fade=False, final=True))
+    lg = L.mark(CX, 650, 1.5) + L.wordmark(CX, 930, 84)
+    br = Stroke(I.browser(CX, 1170, 440, 120), INK, 6, speed=1700)
+    url = Text('www.eskillvisor.com', CX, 1245, 104, BLUE, caps=False, maxw=820)
+    cu = Stroke(I.cursor(CX + 330, 1255, 80), INK, 6)
+    S.append(Scene(82.1, 95.0, [a, b, at(lg[0], 84.1)] + lg[1:] + [at(url, 87.2), hl(url, 10), br, cu], gap=0.12, fade=False, final=True))
     return chain(S)
