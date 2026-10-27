@@ -308,22 +308,22 @@ def make_paper():
 
 
 class Hand:
+    """Photo-real hand holding the marker; its tip follows the pen."""
+
     def __init__(self):
-        import hand
-        self.img, self.shadow = hand.build()
-        self.pad = hand.PAD
-        self.samp = skia.SamplingOptions(skia.FilterMode.kLinear)
+        import realhand
+        self.img = realhand.build()
+        self.pad = realhand.PAD
+        self.samp = skia.SamplingOptions(skia.FilterMode.kLinear, skia.MipmapMode.kNone)
 
     def draw(self, c, pos):
         if pos is None:
             return
         x, y = pos
         # the wrist turns a touch as the pen travels across the page
-        rot = -5.0 * (x - 540) / 540 + 2.0 * (y - 960) / 960
+        rot = -4.0 * (x - 540) / 540 + 1.5 * (y - 960) / 960
         c.save()
         c.translate(x, y)
         c.rotate(rot)
-        c.scale(HAND_SCALE, HAND_SCALE)
-        c.drawImage(self.shadow, -self.pad + 16, -self.pad + 24, self.samp)
         c.drawImage(self.img, -self.pad, -self.pad, self.samp)
         c.restore()
