@@ -6,7 +6,7 @@ import numpy as np
 import skia
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SCALE = 1.1
+SCALE = 1.55
 PAD = 300            # the marker tip sits at (PAD, PAD) in the output image
 ARM_DIR = np.array([0.44, 0.90])   # forearm direction in the photo (towards bottom-right)
 
